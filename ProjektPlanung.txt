@@ -1,0 +1,10 @@
+Autonomes Bewässerungssystem für 1 Pflanze
+
+Offene Meilensteine (Projektantrag) :
+
+1. Hardwarefunktionalität
+  29.07.2026
+2. Hardware steuerbar
+  30.09.2026
+3. Benutzerschnittstelle
+  31.10.2026

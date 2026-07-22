@@ -1,1 +1,3 @@
 # BloomBot
+
+# Gruppenteilnehmer: Tobias Bahlinger, ...

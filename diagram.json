@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "author": "SmartPlant",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": -211.2,
+      "left": -436.76,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led-strip",
+      "id": "strip1",
+      "top": -74.7,
+      "left": -297.6,
+      "attrs": { "pixels": "15" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "strip1:DIN", "esp:25", "green", [ "h-19.2", "v9.2" ] ],
+    [ "strip1:VSS", "esp:GND.2", "black", [ "h-9.6", "v-96.8" ] ],
+    [ "strip1:VDD", "esp:5V", "red", [ "h-28.8", "v67.2", "h-115.2", "v-9.6" ] ]
+  ]
+}

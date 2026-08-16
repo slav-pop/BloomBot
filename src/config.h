@@ -8,8 +8,8 @@
 #define TRIG_PIN       12   // ultrasonic sensor: trigger
 #define ECHO_PIN       14   // ultrasonic sensor: echo
 #define LED_PIN        25   // LED-strip
-#define MOISTURE_PIN   34   // moisture sensor
-#define PUMP_PIN       26   // MOSFET module
+#define MOISTURE_PIN   34   // moisture sensor  - on PICO 26 GP26 (ADC0)
+#define PUMP_PIN       26   // MOSFET module  - on PICO 15 Relais IN PIN
 
 // ============ LED-strip ==============
 #define TOTAL_LEDS     60   // whole 1m of strip
@@ -32,4 +32,13 @@
 // ============ Intervals ===============
 #define TANK_READ_SLOW_MS    2000UL   // idle: rare checks
 #define TANK_READ_FAST_MS    300UL    // watering: react quickly
-#define TANK_FAST_WINDOW_MS  8000UL   // stay fast 8s after pump off
+#define TANK_FAST_WINDOW_MS  8000UL   // stay fast 8s after pump of
+
+
+// ============ Mositure ===============
+#define DRY_VAL 1023  // sensor in air
+#define WET_VAL 372   // sensor in water ranged up to 486, depending on how much the contacts are in the water
+#define THRESHOLD_DRY 30.0f  // randomly picked value for now -> is there a better one or depending on plant ?
+
+// ============ Mositure ===============
+#define RELAIS_ACITVE_LOW true

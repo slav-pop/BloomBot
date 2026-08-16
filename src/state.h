@@ -28,6 +28,7 @@ struct SystemState {
   bool needWater = false;
 
   // ---- pump (from Tobias) ----
+  // bool plantGetsWater = false;  // Testing if water reaches plant, so that the tube is in the plant pot and not on the ground
   bool pumpOn = false;
 
   // ---- network (from Telegram - Luca) ----

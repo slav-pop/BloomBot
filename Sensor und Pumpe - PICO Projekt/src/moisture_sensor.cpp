@@ -1,5 +1,5 @@
 #include "moisture_sensor.hpp"
-#include <algorithm>  // For std::sort
+#include <vector>
 
 static uint8_t moisture_pin;
 
@@ -26,7 +26,8 @@ int moisture_sensor_read_raw_median(uint8_t samples = 5, uint16_t delay_ms = 10)
     if (samples == 0) return 0;  // Edge case: No samples
 
     // Allocate array for readings
-    int readings[samples];
+    std::vector<int> readings(samples);
+    // int readings[samples];
 
     // Take samples
     for (int i = 0; i < samples; i++) {
@@ -35,7 +36,7 @@ int moisture_sensor_read_raw_median(uint8_t samples = 5, uint16_t delay_ms = 10)
     }
 
     // Sort the array
-    std::sort(readings, readings + samples);
+    bubble_sort(readings, samples)
 
     // Return median
     if (samples % 2 == 1) {
@@ -57,4 +58,28 @@ float moisture_sensor_read_percentage() {
 
     // Begrenzen auf 0 - 100%
     return constrain(percentage, 0.0f, 100.0f);
+}
+
+void bubble_sort(int arr[], int len) {
+    int cache;
+
+    for (int i = 0; i < len; i++) {
+        bool all_left_elements_smaller = true;
+
+        for (int s = 0; s < len - i - 1; s++) {
+            bool left_bigger = arr[s] > arr[s+1];
+            if (left_bigger) {
+                cache = arr[s+1];
+                arr[s+1] = arr[s];
+                arr[s] = cache;
+
+                all_left_elements_smaller = false;
+            }
+        }
+        
+        if (all_left_elements_smaller) {
+            // No swapping means, array already in right order
+            break;
+        }
+    }
 }

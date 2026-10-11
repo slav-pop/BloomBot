@@ -57,6 +57,8 @@ static int distanceToPercent(float distCm) {
 // ============================================================
 
 void tankBegin() {
+  pinMode(TANK_POWER_PIN, OUTPUT);
+  digitalWrite(TANK_POWER_PIN, HIGH);   // power the sensor
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
   digitalWrite(TRIG_PIN, LOW);

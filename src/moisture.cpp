@@ -9,15 +9,13 @@
 // static const int DRY_VAL = 1023;   // 1023
 // static const int WET_VAL = 372;  // 372 - 486 ( 529 ) -> Alles komplett im Wasser
 
-void moistureBegin() {
-    pinMode(MOISTURE_PIN, INPUT);
-};
+static unsigned long lastReadAt = 0;
 
 int moisture_sensor_read_raw() {
     return analogRead(MOISTURE_PIN);
 }
 
-int moisture_sensor_read_raw_median(uint8_t samples = 5, uint16_t delay_ms = 10) {
+int moisture_sensor_read_raw_median(uint8_t samples = 5, uint16_t delay_ms = 1) {
     if (samples == 0) return 0;  // Edge case: No samples
 
     // Allocate array for readings
@@ -55,6 +53,9 @@ float setRaw_getPercentage() {
 }
 
 void moistureUpdate() {
+    // Non-blocking timer: exit if the measurement time hasn't come yet
+    if (millis() - lastReadAt < MOISTURE_READ_INTERVAL_MS) return;
+    lastReadAt = millis();
 
     float moisturePercent = setRaw_getPercentage();
 
@@ -64,4 +65,11 @@ void moistureUpdate() {
     else {
         state.needWater = false;
     }
+}
+
+void moistureBegin() {
+    pinMode(MOISTURE_POWER_PIN, OUTPUT);
+    digitalWrite(MOISTURE_POWER_PIN, HIGH);   // power the sensor (always on for now)
+    pinMode(MOISTURE_PIN, INPUT);
+    analogReadResolution(12);   // ESP32: 0..4095
 }

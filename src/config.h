@@ -9,7 +9,9 @@
 #define ECHO_PIN       14   // ultrasonic sensor: echo
 #define LED_PIN        25   // LED-strip
 #define MOISTURE_PIN   34   // moisture sensor  - on PICO 26 GP26 (ADC0)
-#define PUMP_PIN       26   // MOSFET module  - on PICO 15 Relais IN PIN
+#define PUMP_PIN       26   // relay module IN  - on PICO 15 Relais IN PIN
+#define MOISTURE_POWER_PIN  27  // VCC of moisture sensor (3.3 V from GPIO)
+#define TANK_POWER_PIN      33  // breadboard only: VCC of HC-SR04 (no access to 3V3 pin)
 
 // ============ LED-strip ==============
 #define TOTAL_LEDS     60   // whole 1m of strip
@@ -35,10 +37,13 @@
 #define TANK_FAST_WINDOW_MS  8000UL   // stay fast 8s after pump of
 
 
-// ============ Mositure ===============
-#define DRY_VAL 1023  // sensor in air
-#define WET_VAL 372   // sensor in water ranged up to 486, depending on how much the contacts are in the water
+// ============ Moisture ===============
+#define DRY_VAL 4095  // sensor in air (ESP32 ADC saturates at ~3.1 V)
+#define WET_VAL 1500  // sensor in a glass of water (measured 1100-1650, drifts up)
 #define THRESHOLD_DRY 30.0f  // randomly picked value for now -> is there a better one or depending on plant ?
+#define MOISTURE_READ_INTERVAL_MS  2000UL  // for calibration; later the state machine decides
 
-// ============ Mositure ===============
+// ============ Relay ==================
+// true  = relay switches ON when IN is LOW
+// false = relay switches ON when IN is HIGH
 #define RELAIS_ACITVE_LOW true

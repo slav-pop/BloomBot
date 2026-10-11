@@ -3,6 +3,8 @@
 #include "state.h"
 #include "leds.h"
 #include "water_tank.h"
+#include "moisture.h"
+#include "pump.h"
 
 // ============================================================
 //  Test commands in the Serial Monitor:
@@ -99,22 +101,30 @@ static void handleSerial() {
     state.pumpOn = !state.pumpOn;
     Serial.print(state.pumpOn ? "-> PUMP ON (fast tank)" : "-> PUMP OFF");
     break;
-  default:
+  case 'm':
+    Serial.print("MOISTURE: raw=");
+    Serial.print(state.moistureRaw);
+    Serial.print(", needWater=");
+    Serial.println(state.needWater ? "YES" : "NO");
     break;
   }
 }
 
 void setup() {
+  pumpBegin();          // FIRST: relay off as early as possible
+
   Serial.begin(115200);
 
   ledsBegin();
   tankBegin();
+  moistureBegin();
 
-  Serial.print("The system is running. Commands: a, 0–5, t");
+  Serial.println("The system is running. Commands: a, 0-6, t, p, m");
 }
 
 void loop() {
   tankUpdate();
+  moistureUpdate();
   updateStatus();
   ledsUpdate();
   handleSerial();

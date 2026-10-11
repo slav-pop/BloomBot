@@ -1,8 +1,9 @@
 #pragma once
 // ============================================================
-// TODO: change this !
-//  water_tank.h — tank water level sensor module.
-//  Stores the results in 'state': tankDistanceCm, tankPercent, tankLow.
+//  pump.h — water pump module (relay module JQC-3FF-S-Z).
+//  The ONLY module that switches the relay.
+//  Will store the pump status in 'state': pumpOn.
+//  TODO: watering state machine (pumpUpdate is disabled for now).
 // ============================================================
 void pumpBegin();
 void pumpUpdate();

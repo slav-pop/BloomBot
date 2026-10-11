@@ -41,10 +41,27 @@
 #define DRY_VAL 4095  // sensor in air (ESP32 ADC saturates at ~3.1 V)
 #define WET_VAL 1500  // sensor in a glass of water (measured 1100-1650, drifts up)
 #define THRESHOLD_DRY 30.0f  // randomly picked value for now -> is there a better one or depending on plant ?
-#define MOISTURE_READ_INTERVAL_MS  2000UL  // for calibration; later the state machine decides
 
 // ============ Relay ==================
 // true  = relay switches ON when IN is LOW
 // false = relay switches ON when IN is HIGH (jumper "H")
-#define RELAY_ACTIVE_LOW  false   
-#define PUMP_TEST_MS      2000UL  // serial 'p': test run duration
+#define RELAY_ACTIVE_LOW  false
+
+// ============ Watering ===============
+// 1 = short times for testing on the table, 0 = real plant
+#define WATER_TEST_TIMING  1
+
+#if WATER_TEST_TIMING
+  #define MOISTURE_CHECK_INTERVAL_MS  10000UL    // 10 s
+  #define SOAK_MS                     5000UL    // 5 s
+#else
+  #define MOISTURE_CHECK_INTERVAL_MS  3600000UL  // 1 h
+  #define SOAK_MS                     600000UL   // 10 min, adjust in practice
+#endif
+
+#define FIRST_CHECK_DELAY_MS  3000UL   // first soil check after boot (tank needs data first)
+#define PUMP_FLOW_ML_PER_S    23       // measured: ~47 ml in 2 s
+#define WATER_DOSE_ML         50       // one portion. TODO: from plant DB
+#define MAX_WATER_ATTEMPTS    2        // portions in a row before ERROR
+#define PUMP_MAX_ON_MS        10000UL  // hard safety limit for one pump run
+#define TANK_EMPTY_PERCENT    5        // at or below: pump is blocked (no dry running)

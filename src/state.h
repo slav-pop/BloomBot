@@ -12,9 +12,17 @@ enum LedStatus {
   STATUS_WATERING,        // blue comet
   STATUS_LOW_WATER,       // yellow warning
   STATUS_WIFI_CONNECTING, // runnig stripe
-  STATUS_WIFI_CONNECTED,  // white
   STATUS_OKAY,            // green breathing
   STATUS_ERROR            // critical error
+};
+
+// Phases of the watering state machine (pump.cpp)
+enum WaterPhase {
+  PHASE_IDLE,        // waiting for the next soil check
+  PHASE_PUMPING,     // pump is on
+  PHASE_SOAKING,     // pump off, water soaks into the soil
+  PHASE_TANK_EMPTY,  // soil is dry, but no water in the tank
+  PHASE_ERROR        // still dry after all attempts, manual reset needed
 };
 
 struct SystemState {
@@ -23,13 +31,20 @@ struct SystemState {
   int tankPercent = -1;        // water level 0..100; -1 = no data
   bool tankLow = false;
 
-  // ---- soil moisture (from Tobias) ----
-  int moistureRaw = -1;
-  bool needWater = false;
+  // ---- soil moisture (moisture.cpp) ----
+  int moistureRaw = -1;        // ADC 0..4095; -1 = no data
+  int moisturePercent = -1;    // 0..100;      -1 = no data
 
-  // ---- pump (pump.cpp is the ONLY module that writes pumpOn) ----
+  // ---- watering (pump.cpp is the ONLY module that writes these) ----
+  WaterPhase waterPhase = PHASE_IDLE;
+  bool needWater = false;
   bool pumpOn = false;
-  bool pumpTestRequest = false;   // serial 'p': pump.cpp runs the pump for PUMP_TEST_MS
+  uint8_t waterAttempts = 0;
+
+  // ---- requests from the user (serial now, web/bot later) ----
+  // main.cpp sets them to true, pump.cpp handles and clears them
+  bool waterRequest = false;       // "water now"
+  bool errorResetRequest = false;  // "reset the error"
 
   // ---- network (from Telegram - Luca) ----
   bool wifiConnected = false;

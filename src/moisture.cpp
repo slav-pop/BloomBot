@@ -9,7 +9,6 @@
 // static const int DRY_VAL = 1023;   // 1023
 // static const int WET_VAL = 372;  // 372 - 486 ( 529 ) -> Alles komplett im Wasser
 
-static unsigned long lastReadAt = 0;
 
 int moisture_sensor_read_raw() {
     return analogRead(MOISTURE_PIN);
@@ -52,19 +51,9 @@ float setRaw_getPercentage() {
     return constrain(percentage, 0.0f, 100.0f);
 }
 
-void moistureUpdate() {
-    // Non-blocking timer: exit if the measurement time hasn't come yet
-    if (millis() - lastReadAt < MOISTURE_READ_INTERVAL_MS) return;
-    lastReadAt = millis();
-
-    float moisturePercent = setRaw_getPercentage();
-
-    if (moisturePercent < THRESHOLD_DRY) {
-        state.needWater = true;
-    }
-    else {
-        state.needWater = false;
-    }
+void moistureMeasure() {
+    float percent = setRaw_getPercentage();   // also writes state.moistureRaw
+    state.moisturePercent = (int)percent;
 }
 
 void moistureBegin() {

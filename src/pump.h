@@ -1,9 +1,11 @@
 #pragma once
+#include "state.h"
 // ============================================================
-//  pump.h — water pump module (relay module JQC-3FF-S-Z).
-//  The ONLY module that switches the relay.
-//  Will store the pump status in 'state': pumpOn.
-//  TODO: watering state machine (pumpUpdate is disabled for now).
+//  pump.h — watering state machine + relay (JQC-3FF-S-Z).
+//  The ONLY module that switches the pump.
+//  Writes 'state': waterPhase, needWater, pumpOn, waterAttempts, errorFlag.
+//  Reads 'state': moisturePercent, tankPercent, waterRequest, errorResetRequest.
 // ============================================================
 void pumpBegin();
 void pumpUpdate();
+const char* waterPhaseName(WaterPhase p);   // for serial output

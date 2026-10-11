@@ -1,9 +1,8 @@
 #pragma once
 // ============================================================
 //  moisture.h — soil moisture sensor module (resistive HD38).
-//  Reads the sensor and stores the results in 'state':
-//  moistureRaw, needWater.
-//  TODO: read interval (non-blocking), ESP32 calibration (12 bit).
+//  Measures only when asked (by pump.cpp or serial 'm').
+//  Writes 'state': moistureRaw, moisturePercent.
 // ============================================================
 void moistureBegin();
-void moistureUpdate();
+void moistureMeasure();   // one measurement, takes ~5 ms

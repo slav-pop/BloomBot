@@ -27,9 +27,9 @@ struct SystemState {
   int moistureRaw = -1;
   bool needWater = false;
 
-  // ---- pump (from Tobias) ----
-  // bool plantGetsWater = false;  // Testing if water reaches plant, so that the tube is in the plant pot and not on the ground
+  // ---- pump (pump.cpp is the ONLY module that writes pumpOn) ----
   bool pumpOn = false;
+  bool pumpTestRequest = false;   // serial 'p': pump.cpp runs the pump for PUMP_TEST_MS
 
   // ---- network (from Telegram - Luca) ----
   bool wifiConnected = false;

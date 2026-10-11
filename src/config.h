@@ -45,5 +45,6 @@
 
 // ============ Relay ==================
 // true  = relay switches ON when IN is LOW
-// false = relay switches ON when IN is HIGH
-#define RELAIS_ACITVE_LOW true
+// false = relay switches ON when IN is HIGH (jumper "H")
+#define RELAY_ACTIVE_LOW  false   
+#define PUMP_TEST_MS      2000UL  // serial 'p': test run duration

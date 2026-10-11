@@ -98,8 +98,8 @@ static void handleSerial() {
     }
     break;
   case 'p':
-    state.pumpOn = !state.pumpOn;
-    Serial.print(state.pumpOn ? "-> PUMP ON (fast tank)" : "-> PUMP OFF");
+    state.pumpTestRequest = true;
+    Serial.println("-> PUMP TEST requested");
     break;
   case 'm':
     Serial.print("MOISTURE: raw=");
@@ -125,6 +125,7 @@ void setup() {
 void loop() {
   tankUpdate();
   moistureUpdate();
+  pumpUpdate();
   updateStatus();
   ledsUpdate();
   handleSerial();

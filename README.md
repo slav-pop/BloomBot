@@ -8,6 +8,20 @@
 * JQC-3FF-S-Z relay
 * 5V pump
 
+## Telegram-Bot buttons and dialogs
+Status: displays the latest status, data age, and how many days the water supply will last
+Plant: search by name and selection from a list
+Pot: input field for volume in liters (with numeric validation)
+Vacation: date entry, three response options (see below), and confirmation for "eco" mode
+Vacation off
+Reset error: button visible only during the ERROR phase
+
+### Vacation Mode
+The user simply enters their return date. The system handles the rest:
+* days_left ≥ days until return + 1-day buffer → "Everything is fine; there will be enough water until ~Nov 25."
+* Not enough for the full duration, but sufficient in "eco" mode → the bot suggests: "There is only enough water until Nov 16. In eco mode, it will last until ~Nov 22. Shall I enable it?"
+* Not enough even in "eco" mode → the bot states clearly: "There won't be enough water, even in eco mode. Please ask someone to top it up, or install a larger tank."
+
 ### Gruppenteilnehmer: Tobias Bahlinger, ...
 
 # Schritt 1. Installation der Programme:

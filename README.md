@@ -1,5 +1,13 @@
 # BloomBot
 
+## Components
+* ESP32-microcontroller
+* WS2812B LED strip (60 LEDs total, ~20 in use)
+* HC-SR04 sensor
+* 2x HD38 soil moisture sensor
+* JQC-3FF-S-Z relay
+* 5V pump
+
 ### Gruppenteilnehmer: Tobias Bahlinger, ...
 
 # Schritt 1. Installation der Programme:

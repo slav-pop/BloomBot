@@ -9,12 +9,12 @@
 * 5V pump
 
 ## Telegram-Bot buttons and dialogs
-Status: displays the latest status, data age, and how many days the water supply will last
-Plant: search by name and selection from a list
-Pot: input field for volume in liters (with numeric validation)
-Vacation: date entry, three response options (see below), and confirmation for "eco" mode
-Vacation off
-Reset error: button visible only during the ERROR phase
+- Status: displays the latest status, data age, and how many days the water supply will last
+- Plant: search by name and selection from a list
+- Pot: input field for volume in liters (with numeric validation)
+- Vacation: date entry, three response options (see below), and confirmation for "eco" mode
+- Vacation off
+- Reset error: button visible only during the ERROR phase
 
 ### Vacation Mode
 The user simply enters their return date. The system handles the rest:

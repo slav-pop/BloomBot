@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; frame-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>BloomBot · Autonome Bewässerung</title>
+  <meta name="description" content="BloomBot gießt eine Zimmerpflanze selbstständig: Bodenfeuchte messen, in Portionen gießen, Tank überwachen. Ausbildungsprojekt mit ESP32, Pumpe und LED-Statusanzeige.">
+  <meta name="theme-color" content="#F5F2EA" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1A1C17" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="BloomBot · Autonome Bewässerung">
+  <meta property="og:description" content="Eine Pflanze, ein ESP32, eine Pumpe – und nie wieder vergessen zu gießen.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+
+<a class="skip" href="#main">Zum Inhalt springen</a>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="#top" aria-label="BloomBot – nach oben">
+      <img src="img/logo.svg" alt="" width="34" height="34">
+      <span>BloomBot</span>
+    </a>
+    <nav class="nav" aria-label="Hauptnavigation">
+      <a href="#ablauf">Ablauf</a>
+      <a href="#simulation">Simulation</a>
+      <a href="#technik">Technik</a>
+      <a href="#app">App</a>
+      <a href="#team">Team</a>
+    </nav>
+    <a class="btn btn-small btn-primary" href="app/">App öffnen</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============ Hero ============ -->
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="dot dot-live" aria-hidden="true"></span>Ausbildungsprojekt 2026 · Autonome Bewässerung</p>
+        <h1 id="hero-title">Gießt, bevor deine Pflanze <em>durstig</em> wird.</h1>
+        <p class="lead">
+          BloomBot misst die Feuchte in der Erde, gießt in kleinen Portionen genau so viel,
+          wie die Pflanze braucht, und passt dabei auf den Wassertank auf. Ganz ohne Handgriff
+          und auch ohne WLAN.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#simulation">Live ausprobieren</a>
+          <a class="btn btn-ghost" href="app/">Pflanze wählen
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
+        <dl class="facts">
+          <div><dt>Pflanzenprofile</dt><dd>55</dd></div>
+          <div><dt>Pumpe</dt><dd>23<small> ml/s</small></dd></div>
+          <div><dt>Budget</dt><dd>60<small> €</small></dd></div>
+        </dl>
+      </div>
+
+      <figure class="hero-art">
+        <svg class="scene" viewBox="0 0 480 460" role="img" aria-labelledby="hero-art-title">
+          <title id="hero-art-title">BloomBot: Pflanze im Topf mit Feuchtesensor, daneben Wassertank mit Pumpe und LED-Leiste, ein Schlauch führt zur Pflanze</title>
+          <defs>
+            <linearGradient id="h-water" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="var(--water)" stop-opacity=".75"/>
+              <stop offset="1" stop-color="var(--water-deep)"/>
+            </linearGradient>
+            <linearGradient id="h-pot" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="var(--clay)"/>
+              <stop offset="1" stop-color="var(--clay-deep)"/>
+            </linearGradient>
+            <clipPath id="h-tank-clip"><rect x="58" y="210" width="96" height="170" rx="18"/></clipPath>
+          </defs>
+          <path class="scene-arch" d="M40 440V200C40 100 130 30 240 30s200 70 200 170v240Z"/>
+          <!-- Schlauch -->
+          <path class="scene-tube" d="M106 236V176c0-26 18-42 44-42h112c26 0 40 16 40 40v58"/>
+          <path class="scene-flow" d="M106 236V176c0-26 18-42 44-42h112c26 0 40 16 40 40v58"/>
+          <!-- Pflanze -->
+          <g class="scene-plant">
+            <path class="stem" d="M300 300c-2-40-14-74-40-104"/>
+            <path class="stem" d="M304 300c6-44 26-76 64-96"/>
+            <path class="stem" d="M302 300c0-50 4-92 20-128"/>
+            <path class="leaf" d="M260 196c-40 2-66-24-68-62 40-4 70 22 68 62Z"/>
+            <path class="leaf leaf-b" d="M368 204c6-40 38-62 76-58-4 40-36 64-76 58Z"/>
+            <path class="leaf leaf-c" d="M322 172c-24-32-20-72 10-98 22 32 18 72-10 98Z"/>
+          </g>
+          <!-- Topf -->
+          <path d="M232 300h148l-16 118a14 14 0 0 1-14 12h-88a14 14 0 0 1-14-12Z" fill="url(#h-pot)"/>
+          <rect x="224" y="288" width="164" height="24" rx="10" class="scene-rim"/>
+          <!-- Sensor -->
+          <rect x="350" y="252" width="16" height="22" rx="4" class="scene-sensor-head"/>
+          <path d="M354 274v58M362 274v58" class="scene-sensor"/>
+          <!-- Tank -->
+          <rect x="54" y="206" width="104" height="178" rx="22" class="scene-glass"/>
+          <rect class="scene-water" x="58" y="262" width="96" height="118" fill="url(#h-water)" clip-path="url(#h-tank-clip)"/>
+          <rect x="84" y="340" width="44" height="30" rx="8" class="scene-pump"/>
+          <!-- Basis mit LED-Leiste -->
+          <rect x="40" y="396" width="400" height="38" rx="14" class="scene-base"/>
+          <g class="scene-leds" aria-hidden="true">
+            <circle cx="96" cy="415" r="5"/><circle cx="118" cy="415" r="5"/><circle cx="140" cy="415" r="5"/>
+            <circle cx="162" cy="415" r="5"/><circle cx="184" cy="415" r="5"/><circle cx="206" cy="415" r="5"/>
+            <circle cx="228" cy="415" r="5"/><circle cx="250" cy="415" r="5"/><circle cx="272" cy="415" r="5"/>
+            <circle cx="294" cy="415" r="5"/><circle cx="316" cy="415" r="5"/><circle cx="338" cy="415" r="5"/>
+            <circle cx="360" cy="415" r="5"/><circle cx="382" cy="415" r="5"/>
+          </g>
+        </svg>
+        <figcaption class="chips" aria-hidden="true">
+          <span class="chip chip-moist"><b>42 %</b> Bodenfeuchte<i class="meter"><i></i></i></span>
+          <span class="chip chip-phase"><span class="dot dot-ok"></span>Alles gut · nächste Prüfung in 38 min</span>
+          <span class="chip chip-tank"><b>63 %</b> im Tank</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============ Ablauf ============ -->
+  <section class="section" id="ablauf" aria-labelledby="ablauf-title">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">So funktioniert’s</p>
+        <h2 id="ablauf-title">Messen. Entscheiden. <em>Portionsweise</em> gießen.</h2>
+        <p class="section-lead">Jede Stunde prüft BloomBot die Erde. Wann gegossen wird und wie viel, hängt vom Profil der gewählten Pflanze ab.</p>
+      </header>
+
+      <ol class="steps">
+        <li class="step">
+          <span class="step-num" aria-hidden="true">01</span>
+          <h3>Messen</h3>
+          <p>Ein Feuchtesensor steckt in der Erde und liefert einen Wert von 0 bis 100 %. Ein Ultraschallsensor misst den Wasserstand im Tank.</p>
+        </li>
+        <li class="step">
+          <span class="step-num" aria-hidden="true">02</span>
+          <h3>Entscheiden</h3>
+          <p>Liegt die Feuchte unter dem Minimum der Pflanze, startet ein Gießzyklus. Über dem sicheren Maximum schaltet die Pumpe nie ein.</p>
+        </li>
+        <li class="step">
+          <span class="step-num" aria-hidden="true">03</span>
+          <h3>Gießen &amp; einsickern lassen</h3>
+          <p>Eine Portion, dann 10 Minuten warten, dann neu messen. So lange, bis das Ziel erreicht ist. Bleibt die Erde trocken, meldet BloomBot einen Fehler statt weiterzupumpen.</p>
+        </li>
+        <li class="step">
+          <span class="step-num" aria-hidden="true">04</span>
+          <h3>Zeigen</h3>
+          <p>Die LED-Leiste zeigt den Zustand auf einen Blick: alles gut, durstig, gießt gerade, Tank fast leer oder Fehler.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ Simulation ============ -->
+  <section class="section section-night" id="simulation" aria-labelledby="sim-title">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow eyebrow-light">Interaktive Simulation</p>
+        <h2 id="sim-title">Die echte Gießlogik, im <em>Zeitraffer</em>.</h2>
+        <p class="section-lead">Dieselbe Zustandsmaschine wie auf dem ESP32, mit denselben Ereignissen. Zieh den Schlauch ab oder lass den Tank leerlaufen und sieh zu, wie BloomBot reagiert.</p>
+      </header>
+
+      <div class="sim" data-sim>
+        <div class="sim-stage">
+          <svg class="sim-scene" viewBox="0 0 420 300" role="img" aria-labelledby="sim-scene-title">
+            <title id="sim-scene-title">Simulation: Wassertank mit Pumpe, Schlauch und Pflanzentopf</title>
+            <defs>
+              <clipPath id="s-tank-clip"><rect x="34" y="74" width="92" height="182" rx="14"/></clipPath>
+            </defs>
+            <rect x="30" y="70" width="100" height="190" rx="18" class="s-glass"/>
+            <rect data-sim-water x="34" y="74" width="92" height="182" class="s-water" clip-path="url(#s-tank-clip)"/>
+            <line x1="34" x2="126" y1="219.6" y2="219.6" class="s-mark"/>
+            <rect x="60" y="222" width="40" height="28" rx="7" class="s-pump"/>
+            <circle cx="80" cy="236" r="5.5" class="s-pump-dot"/>
+            <g class="s-hose">
+              <path d="M80 222V50c0-20 16-28 40-28h130c22 0 32 14 32 36v40" class="s-tube"/>
+              <path d="M80 222V50c0-20 16-28 40-28h130c22 0 32 14 32 36v40" class="s-flow"/>
+            </g>
+            <g class="s-drops">
+              <path d="M282 112s-6 8-6 12a6 6 0 0 0 12 0c0-4-6-12-6-12Z"/>
+              <path d="M290 134s-4 5.5-4 8.3a4 4 0 0 0 8 0c0-2.8-4-8.3-4-8.3Z"/>
+            </g>
+            <g class="s-plant">
+              <path d="M290 176c-2-26-8-48-18-66" class="s-stem"/>
+              <path d="M288 170c8-24 22-38 42-48" class="s-stem"/>
+              <path d="M272 110c-24-6-34-26-28-48 24 4 36 26 28 48Z" class="s-leaf"/>
+              <path d="M330 122c4-24 22-36 44-34-2 24-20 38-44 34Z" class="s-leaf"/>
+            </g>
+            <path d="M226 180h128l-14 82H240Z" class="s-pot"/>
+            <rect x="220" y="172" width="140" height="20" rx="7" class="s-pot-rim"/>
+            <ellipse data-sim-soil cx="290" cy="176" rx="64" ry="5"/>
+            <rect x="321" y="148" width="12" height="12" rx="3" class="s-sensor-head"/>
+            <path d="M324 160v46M330 160v46" class="s-sensor"/>
+            <rect x="10" y="266" width="400" height="8" rx="4" class="s-table"/>
+          </svg>
+          <div class="led-strip" data-sim-leds aria-hidden="true"></div>
+        </div>
+
+        <div class="sim-panel">
+          <div class="sim-status" role="status" aria-live="polite">
+            <span class="status-led" aria-hidden="true"></span>
+            <div>
+              <strong data-sim-status>Alles gut</strong>
+              <span class="sim-phase" aria-hidden="true">Phase <code data-sim-phase>IDLE</code></span>
+            </div>
+          </div>
+
+          <dl class="readings">
+            <div class="reading reading-wide">
+              <dt>Bodenfeuchte</dt>
+              <dd><span data-sim-moisture>–</span>
+                <span class="gauge" aria-hidden="true">
+                  <span class="gauge-band" data-sim-band></span>
+                  <span class="gauge-target" data-sim-target></span>
+                  <span class="gauge-value" data-sim-needle></span>
+                </span>
+              </dd>
+            </div>
+            <div class="reading"><dt>Tank</dt><dd data-sim-tank>–</dd></div>
+            <div class="reading"><dt>Portion</dt><dd data-sim-portion>–</dd></div>
+          </dl>
+
+          <fieldset class="segmented" aria-label="Pflanzenprofil">
+            <legend>Pflanzenprofil</legend>
+            <label><input type="radio" name="plant" value="low"><span>Kaktus</span></label>
+            <label><input type="radio" name="plant" value="medium" checked><span>Grünpflanze</span></label>
+            <label><input type="radio" name="plant" value="high"><span>Farn</span></label>
+          </fieldset>
+
+          <label class="range">
+            <span>Zeitraffer <output data-sim-speed-out>2×</output></span>
+            <input type="range" min="1" max="8" step="1" value="2" data-sim-speed>
+          </label>
+
+          <div class="sim-actions">
+            <button type="button" class="btn btn-light" data-sim-toggle>Pause</button>
+            <button type="button" class="btn btn-outline-light" data-sim-refill>Tank auffüllen</button>
+            <button type="button" class="btn btn-outline-light" data-sim-hose>Schlauch abziehen</button>
+            <button type="button" class="btn btn-warn" data-sim-reset hidden>Fehler zurücksetzen</button>
+          </div>
+        </div>
+
+        <aside class="sim-log" aria-labelledby="log-title">
+          <h3 id="log-title">Ereignisse vom Gerät</h3>
+          <ol data-sim-log role="log">
+            <li class="log-empty">Noch nichts passiert. Warte kurz oder dreh am Zeitraffer.</li>
+          </ol>
+        </aside>
+      </div>
+
+      <ul class="legend" aria-label="Bedeutung der LED-Farben">
+        <li><span class="swatch swatch-okay" aria-hidden="true"></span><b>Grün, atmend</b>alles gut</li>
+        <li><span class="swatch swatch-need" aria-hidden="true"></span><b>Rot, atmend</b>Erde trocken</li>
+        <li><span class="swatch swatch-watering" aria-hidden="true"></span><b>Blau, Lauflicht</b>Pumpe läuft</li>
+        <li><span class="swatch swatch-low" aria-hidden="true"></span><b>Orange</b>Tank auffüllen</li>
+        <li><span class="swatch swatch-error" aria-hidden="true"></span><b>Rot, Doppelblitz</b>Fehler prüfen</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ Technik ============ -->
+  <section class="section" id="technik" aria-labelledby="technik-title">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">Technik</p>
+        <h2 id="technik-title">Wenig Teile, <em>viel Sorgfalt</em>.</h2>
+      </header>
+
+      <div class="bento">
+        <article class="tile tile-hero">
+          <p class="tile-kicker">Gehirn</p>
+          <h3>ESP32</h3>
+          <p>Liest die Sensoren, steuert Relais und LEDs und entscheidet selbst, wann gegossen wird. Das Gießen funktioniert komplett ohne Netz.</p>
+          <ul class="pins" aria-label="Belegung">
+            <li><code>GPIO 34</code> Bodenfeuchte</li>
+            <li><code>GPIO 26</code> Relais / Pumpe</li>
+            <li><code>GPIO 12/14</code> Ultraschall</li>
+            <li><code>GPIO 25</code> LED-Leiste</li>
+          </ul>
+        </article>
+        <article class="tile">
+          <p class="tile-kicker">Sensor</p>
+          <h3>HD38 Bodenfeuchte</h3>
+          <p>Kalibriert zwischen trocken (Luft) und nass (Wasser), umgerechnet in 0–100 %.</p>
+        </article>
+        <article class="tile">
+          <p class="tile-kicker">Sensor</p>
+          <h3>HC-SR04 Tank</h3>
+          <p>Misst den Abstand zur Wasseroberfläche. Warnung unter 20 %, mit Hysterese bis 25 %.</p>
+        </article>
+        <article class="tile">
+          <p class="tile-kicker">Aktor</p>
+          <h3>5-V-Pumpe + Relais</h3>
+          <p>Rund 23 ml pro Sekunde. Die Menge wird in Millilitern dosiert, nicht nach Gefühl.</p>
+        </article>
+        <article class="tile">
+          <p class="tile-kicker">Anzeige</p>
+          <h3>WS2812B LED-Leiste</h3>
+          <p>15 aktive LEDs mit Strombegrenzung. Jede Farbe hat eine feste Bedeutung.</p>
+        </article>
+        <article class="tile tile-safety">
+          <p class="tile-kicker">Sicherheit zuerst</p>
+          <h3>Was die Pumpe niemals tut</h3>
+          <ul class="checks">
+            <li>laufen, wenn der Tank leer ist (≤ 5 %)</li>
+            <li>länger als 10 Sekunden am Stück laufen</li>
+            <li>gießen, wenn die Erde schon feucht genug ist</li>
+            <li>beim Start eingeschaltet sein: das Relais geht als Erstes aus</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ App ============ -->
+  <section class="section section-tint" id="app" aria-labelledby="app-title">
+    <div class="wrap app-grid">
+      <div class="phone">
+        <!-- Nur Vorschau: inert nimmt die App aus der Tab-Reihenfolge, der Button unten öffnet sie richtig. -->
+        <div class="phone-screen" inert>
+          <iframe src="app/" title="BloomBot App (Vorschau)" loading="lazy"></iframe>
+        </div>
+      </div>
+      <div class="app-copy">
+        <p class="eyebrow">Die App</p>
+        <h2 id="app-title">Einmal einstellen, <em>fertig</em>.</h2>
+        <p class="section-lead">Wähle deine Pflanze und die Topfgröße. Die App zeigt sofort das Profil, mit dem BloomBot gießt, genau so, wie es auf dem Gerät landet.</p>
+        <ul class="feature-list">
+          <li><b>55 Pflanzen</b> mit Feuchte-Grenzen, Gießrhythmus und Lichtbedarf</li>
+          <li><b>Portion in ml</b>, berechnet aus der Topfgröße und begrenzt auf sichere Werte</li>
+          <li><b>Gießen ab / Ziel / nie über</b>: die drei Schwellen auf einen Blick</li>
+          <li><b>Läuft im Browser</b> auf jedem Handy, ohne Installation</li>
+        </ul>
+        <a class="btn btn-primary" href="app/">App öffnen</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Telegram (geplant) ============ -->
+  <section class="section" id="telegram" aria-labelledby="tg-title">
+    <div class="wrap tg-grid">
+      <div>
+        <p class="eyebrow"><span class="badge">In Arbeit</span> Telegram-Bot</p>
+        <h2 id="tg-title">Meldet sich nur, <em>wenn es zählt</em>.</h2>
+        <p class="section-lead">Ein Telegram-Bot verbindet BloomBot mit dem Handy. Er schickt Hinweise, wenn etwas zu tun ist, und übernimmt die Einstellungen. Fernsteuern kann man die Pumpe bewusst nicht.</p>
+        <ul class="feature-list">
+          <li><b>Status</b>: letzte Messung und wie lange das Wasser noch reicht</li>
+          <li><b>Urlaubsmodus</b>: Rückkehrdatum eingeben, BloomBot rechnet und schlägt bei Bedarf den Sparmodus vor</li>
+          <li><b>Fehler zurücksetzen</b>, nachdem Schlauch oder Sensor geprüft wurden</li>
+        </ul>
+      </div>
+      <div class="chat" aria-label="Beispiel-Unterhaltung mit dem Bot">
+        <p class="msg msg-in">Wenig Wasser im Tank (~2 Tage). Bitte nachfüllen.</p>
+        <p class="msg msg-out">Urlaub bis 22.11.</p>
+        <p class="msg msg-in">Das Wasser reicht nur bis 16.11. Im Sparmodus bis ~22.11. Einschalten?</p>
+        <p class="msg msg-out">Ja</p>
+        <p class="msg msg-in">Sparmodus aktiv. Ich halte die Erde an der unteren sicheren Grenze. 🌿</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Projekt ============ -->
+  <section class="section section-tint" id="projekt" aria-labelledby="projekt-title">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">Projektverlauf</p>
+        <h2 id="projekt-title">Von der Idee zum <em>fertigen Gerät</em>.</h2>
+      </header>
+      <ol class="timeline">
+        <li><time datetime="2026-07-06">06.07.</time><span>Projektstart</span></li>
+        <li><time datetime="2026-07-10">10.07.</time><span>Planung und Aufgabenverteilung</span></li>
+        <li><time datetime="2026-07-21">21.07.</time><span>Bauteile beschafft</span></li>
+        <li><time datetime="2026-07-29">29.07.</time><span>Komponenten arbeiten zusammen</span></li>
+        <li><time datetime="2026-09-30">30.09.</time><span>Hardware ist steuerbar</span></li>
+        <li><time datetime="2026-10-31">31.10.</time><span>Benutzerschnittstelle fertig</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ Team ============ -->
+  <section class="section" id="team" aria-labelledby="team-title">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">Team</p>
+        <h2 id="team-title">Fünf Leute, <em>eine Pflanze</em>.</h2>
+        <p class="section-lead">Für viele von uns das erste richtige Projekt: von der Planung über Löten und Firmware bis zur App.</p>
+      </header>
+      <ul class="team">
+        <li><span class="avatar a1" aria-hidden="true">JB</span>Julia Baumgartner</li>
+        <li><span class="avatar a2" aria-hidden="true">LW</span>Luca Weber</li>
+        <li><span class="avatar a3" aria-hidden="true">TB</span>Tobias Bahlinger</li>
+        <li><span class="avatar a4" aria-hidden="true">VK</span>Vladylen Korol</li>
+        <li><span class="avatar a5" aria-hidden="true">VH</span>Vladyslav Honsales</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <a class="brand" href="#top">
+      <img src="img/logo.svg" alt="" width="28" height="28">
+      <span>BloomBot</span>
+    </a>
+    <p>Ausbildungsprojekt 2026 · ESP32 · PlatformIO · Vue</p>
+    <a href="app/">App öffnen →</a>
+  </div>
+</footer>
+
+</body>
+</html>

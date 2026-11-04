@@ -5,3 +5,12 @@
 .vscode/ipch
 .vscode/
 DB/
+
+# Web (app/, site/)
+node_modules/
+app/dist/
+_site/
+coverage/
+
+# Betriebssystem
+.DS_Store

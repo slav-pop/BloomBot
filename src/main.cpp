@@ -5,6 +5,7 @@
 #include "water_tank.h"
 #include "moisture.h"
 #include "pump.h"
+#include "wifi_ota.h"
 
 // ============================================================
 //  Commands in the Serial Monitor:
@@ -13,6 +14,7 @@
 //    m     - measure soil now
 //    w     - water now (goes through all safety checks)
 //    r     - reset watering error
+//    i     - Wi-Fi: IP address and signal
 //    a     - LED: automatic status (normal mode)
 //    0..6  - LED: force a status (test):
 //            0=rainbow 1=need water 2=watering 3=low water
@@ -97,6 +99,9 @@ static void handleSerial() {
     state.errorResetRequest = true;
     Serial.println("-> reset error (only in ERROR)");
     break;
+  case 'i':
+    wifiOtaPrintInfo();
+    break;
   case 'a':
     manualMode = false;
     Serial.println("-> LED auto mode");
@@ -120,14 +125,16 @@ void setup() {
   ledsBegin();
   tankBegin();
   moistureBegin();
+  wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
-  Serial.println("The system is running. Commands: s t m w r a 0-6");
+  Serial.println("The system is running. Commands: s t m w r i a 0-6");
 #if WATER_TEST_TIMING
   Serial.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");
 #endif
 }
 
 void loop() {
+  wifiOtaUpdate();      // keep first: OTA must be handled often
   tankUpdate();
   pumpUpdate();
   updateStatus();

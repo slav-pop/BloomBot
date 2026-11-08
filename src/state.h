@@ -46,7 +46,7 @@ struct SystemState {
   bool waterRequest = false;       // "water now"
   bool errorResetRequest = false;  // "reset the error"
 
-  // ---- network (from Telegram - Luca) ----
+  // ---- network (wifi_ota.cpp is the ONLY module that writes these) ----
   bool wifiConnected = false;
   bool wifiConnecting = false;
 

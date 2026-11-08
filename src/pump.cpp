@@ -24,9 +24,11 @@ static unsigned long pumpStartedAt  = 0;   // when the pump was switched on
 static unsigned long lastCheckAt    = 0;   // last soil check
 static unsigned long checkDelay     = FIRST_CHECK_DELAY_MS;  // time until next check
 static unsigned long pumpTimeMs     = 0;   // how long to pump this time
+static bool locked = false;                // pumpLock(): never switch on again until reboot
 
 // ---- the only place where the relay pin is written ----
 static void water_pump_on() {
+    if (locked) return;
     digitalWrite(PUMP_PIN, RELAY_ACTIVE_LOW ? LOW : HIGH);
     state.pumpOn = true;
     pumpStartedAt = millis();
@@ -125,7 +127,14 @@ void pumpBegin() {
     lastCheckAt = millis();
 }
 
+void pumpLock() {
+    locked = true;
+    water_pump_off();
+}
+
 void pumpUpdate() {
+    if (locked) return;   // OTA update running: nothing happens until reboot
+
     unsigned long now = millis();
     unsigned long inPhase = now - phaseStartedAt;
 

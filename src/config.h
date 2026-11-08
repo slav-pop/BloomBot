@@ -65,3 +65,8 @@
 #define MAX_WATER_ATTEMPTS    2        // portions in a row before ERROR
 #define PUMP_MAX_ON_MS        10000UL  // hard safety limit for one pump run
 #define TANK_EMPTY_PERCENT    5        // at or below: pump is blocked (no dry running)
+
+// ============ Wi-Fi / OTA =============
+// SSID and passwords live in src/secrets.h (not in git)
+#define OTA_HOSTNAME   "bloombot"   // -> bloombot.local
+#define WIFI_RETRY_MS  15000UL      // next connection attempt if Wi-Fi is down

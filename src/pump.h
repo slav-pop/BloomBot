@@ -9,3 +9,4 @@
 void pumpBegin();
 void pumpUpdate();
 const char* waterPhaseName(WaterPhase p);   // for serial output
+void pumpLock();   // pump off and blocked until reboot (OTA update)

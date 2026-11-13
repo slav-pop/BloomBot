@@ -23,12 +23,32 @@
 
 static bool manualMode = false;  // true = manual LED choice from keyboard
 
+// serial 'm': the measurement is non-blocking, print when the result is there
+static bool printMoistureWhenReady = false;
+static uint32_t printMoistureSeq = 0;
+
+static void printMoisture() {
+  Serial.print("MOISTURE: sensor1 raw=");
+  Serial.print(state.moistureRaw[0]);
+  Serial.print(" (");
+  Serial.print(state.moistureSensorIndex[0]);
+  Serial.print("), sensor2 raw=");
+  Serial.print(state.moistureRaw[1]);
+  Serial.print(" (");
+  Serial.print(state.moistureSensorIndex[1]);
+  Serial.print(") -> ");
+  Serial.print(state.moistureIndex);
+  Serial.print(state.moistureSensorFail ? "/100 BOTH FAILED" : state.moistureMismatch ? "/100 MISMATCH" : "/100");
+  Serial.print(", ledStatus=");
+  Serial.println(state.ledStatus);
+}
+
 // ---- Core: choose what is more important to show ----
 // error > watering > low/empty tank > dry soil > connecting > okay > idle
 static void updateStatus() {
   if (manualMode) return;
 
-  if (state.errorFlag) {
+  if (state.errorFlag || state.tankSensorFail || state.moistureSensorFail) {
     state.ledStatus = STATUS_ERROR;               // the error overrides everything else
   } else if (state.pumpOn) {
     state.ledStatus = STATUS_WATERING;
@@ -38,7 +58,7 @@ static void updateStatus() {
     state.ledStatus = STATUS_NEED_WATER;
   } else if (state.wifiConnecting) {
     state.ledStatus = STATUS_WIFI_CONNECTING;
-  } else if (state.moistureRaw >= 0) {
+  } else if (state.moistureIndex >= 0) {
     state.ledStatus = STATUS_OKAY;                // sensor data present, all fine
   } else {
     state.ledStatus = STATUS_IDLE;                // no data yet
@@ -73,7 +93,7 @@ static void handleSerial() {
   case 't':
     Serial.print("TANK: ");
     if (state.tankPercent < 0) {
-      Serial.println("no data");
+      Serial.println(state.tankSensorFail ? "SENSOR FAILED (no echo)" : "no data");
     } else {
       Serial.print(state.tankDistanceCm, 1);
       Serial.print(" cm to water, level ");
@@ -83,13 +103,9 @@ static void handleSerial() {
     }
     break;
   case 'm':
-    moistureMeasure();
-    Serial.print("MOISTURE: raw=");
-    Serial.print(state.moistureRaw);
-    Serial.print(", ");
-    Serial.print(state.moisturePercent);
-    Serial.print(" %, ledStatus=");
-    Serial.println(state.ledStatus);
+    printMoistureSeq = state.moistureSeq;
+    printMoistureWhenReady = true;
+    moistureRequest();
     break;
   case 'w':
     state.waterRequest = true;
@@ -136,8 +152,14 @@ void setup() {
 void loop() {
   wifiOtaUpdate();      // keep first: OTA must be handled often
   tankUpdate();
+  moistureUpdate();     // before pumpUpdate: a finished result is used in the same loop
   pumpUpdate();
   updateStatus();
   ledsUpdate();
   handleSerial();
+
+  if (printMoistureWhenReady && state.moistureSeq != printMoistureSeq) {
+    printMoistureWhenReady = false;
+    printMoisture();
+  }
 }

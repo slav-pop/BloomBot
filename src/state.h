@@ -30,10 +30,15 @@ struct SystemState {
   float tankDistanceCm = -1;   // distance to water;  -1 = no data/error
   int tankPercent = -1;        // water level 0..100; -1 = no data
   bool tankLow = false;
+  bool tankSensorFail = false; // TANK_MAX_FAILS failed readings in a row
 
   // ---- soil moisture (moisture.cpp) ----
-  int moistureRaw = -1;        // ADC 0..4095; -1 = no data
-  int moisturePercent = -1;    // 0..100;      -1 = no data
+  int moistureRaw[2] = { -1, -1 };        // ADC 0..4095 per sensor; -1 = failed / no data
+  int moistureSensorIndex[2] = { -1, -1 }; // index 0..100 per sensor; -1 = failed / no data
+  int moistureIndex = -1;      // combined index 0..100 (0 = dry soil, 100 = freshly watered), used for watering; -1 = no data
+  bool moistureSensorFail = false;  // both sensors failed -> no watering
+  bool moistureMismatch = false;    // sensors differ by more than MOISTURE_MISMATCH_DIFF
+  uint32_t moistureSeq = 0;         // +1 after every finished measurement
 
   // ---- watering (pump.cpp is the ONLY module that writes these) ----
   WaterPhase waterPhase = PHASE_IDLE;

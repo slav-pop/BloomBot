@@ -26,6 +26,11 @@ static unsigned long checkDelay     = FIRST_CHECK_DELAY_MS;  // time until next 
 static unsigned long pumpTimeMs     = 0;   // how long to pump this time
 static bool locked = false;                // pumpLock(): never switch on again until reboot
 
+// soil check is non-blocking: request a measurement, evaluate it when ready
+static bool soilPending = false;           // waiting for a moisture result
+static bool soilAfterWatering = false;     // the pending check follows a portion
+static uint32_t soilSeq = 0;               // state.moistureSeq when requested
+
 // ---- the only place where the relay pin is written ----
 static void water_pump_on() {
     if (locked) return;
@@ -56,6 +61,7 @@ const char* waterPhaseName(WaterPhase p) {
 }
 
 static void enterPhase(WaterPhase p) {
+    soilPending = false;                   // a phase change cancels a pending check
     state.waterPhase = p;
     phaseStartedAt = millis();
     Serial.print("WATER: -> ");
@@ -87,21 +93,45 @@ static void startPumping() {
     enterPhase(PHASE_PUMPING);
 }
 
-// ---- measure the soil and decide what to do ----
-static void checkSoil(bool afterWatering) {
-    moistureMeasure();
+// ---- start a soil measurement; checkSoil() runs when the result is there ----
+static void requestSoilCheck(bool afterWatering) {
+    soilSeq = state.moistureSeq;
+    soilAfterWatering = afterWatering;
+    soilPending = true;
     lastCheckAt = millis();
     checkDelay = MOISTURE_CHECK_INTERVAL_MS;
+    moistureRequest();
+}
 
+// true once, when the requested measurement has finished
+static bool soilResultReady() {
+    if (!soilPending || state.moistureSeq == soilSeq) return false;
+    soilPending = false;
+    return true;
+}
+
+// ---- the soil was measured: decide what to do ----
+static void checkSoil(bool afterWatering) {
     Serial.print("WATER: soil ");
-    Serial.print(state.moisturePercent);
-    Serial.print("% (raw ");
-    Serial.print(state.moistureRaw);
+    Serial.print(state.moistureIndex);
+    Serial.print("/100 (sensors ");
+    Serial.print(state.moistureSensorIndex[0]);
+    Serial.print(" / ");
+    Serial.print(state.moistureSensorIndex[1]);
     Serial.print("), threshold ");
-    Serial.print((int)THRESHOLD_DRY);
-    Serial.println("%");
+    Serial.println((int)THRESHOLD_DRY);
 
-    if (state.moisturePercent >= THRESHOLD_DRY) {   // soil ok
+    // Both sensors failed: do not water blind. Back to IDLE, the next
+    // regular check tries again (LED shows the error via moistureSensorFail).
+    if (state.moistureIndex < 0) {
+        Serial.println("WATER: no data from both moisture sensors - no watering");
+        state.needWater = false;
+        state.waterAttempts = 0;
+        if (state.waterPhase != PHASE_IDLE) enterPhase(PHASE_IDLE);
+        return;
+    }
+
+    if (state.moistureIndex >= THRESHOLD_DRY) {   // soil ok
         state.needWater = false;
         state.waterAttempts = 0;
         if (state.waterPhase != PHASE_IDLE) enterPhase(PHASE_IDLE);
@@ -150,8 +180,10 @@ void pumpUpdate() {
                 state.needWater = true;
                 state.waterAttempts = 0;
                 startPumping();
-            } else if (now - lastCheckAt >= checkDelay) {
-                checkSoil(false);
+            } else if (soilResultReady()) {
+                checkSoil(soilAfterWatering);
+            } else if (!soilPending && now - lastCheckAt >= checkDelay) {
+                requestSoilCheck(false);
             }
             break;
 
@@ -166,7 +198,8 @@ void pumpUpdate() {
             break;
 
         case PHASE_SOAKING:
-            if (inPhase >= SOAK_MS) checkSoil(true);
+            if (soilResultReady()) checkSoil(true);
+            else if (!soilPending && inPhase >= SOAK_MS) requestSoilCheck(true);
             break;
 
         case PHASE_TANK_EMPTY:

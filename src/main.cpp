@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "config.h"
 #include "state.h"
+#include "logger.h"
 #include "leds.h"
 #include "water_tank.h"
 #include "moisture.h"
@@ -9,7 +10,7 @@
 #include "profile.h"
 
 // ============================================================
-//  Commands in the Serial Monitor:
+//  Commands - in the Serial Monitor (cable) or over Wi-Fi (telnet, see logger.h):
 //    s     - watering status
 //    t     - tank data
 //    m     - measure soil now
@@ -31,19 +32,19 @@ static bool printMoistureWhenReady = false;
 static uint32_t printMoistureSeq = 0;
 
 static void printMoisture() {
-  Serial.print("MOISTURE: sensor1 raw=");
-  Serial.print(state.moistureRaw[0]);
-  Serial.print(" (");
-  Serial.print(state.moistureSensorIndex[0]);
-  Serial.print("), sensor2 raw=");
-  Serial.print(state.moistureRaw[1]);
-  Serial.print(" (");
-  Serial.print(state.moistureSensorIndex[1]);
-  Serial.print(") -> ");
-  Serial.print(state.moistureIndex);
-  Serial.print(state.moistureSensorFail ? "/100 BOTH FAILED" : state.moistureMismatch ? "/100 MISMATCH" : "/100");
-  Serial.print(", ledStatus=");
-  Serial.println(state.ledStatus);
+  Log.print("MOISTURE: sensor1 raw=");
+  Log.print(state.moistureRaw[0]);
+  Log.print(" (");
+  Log.print(state.moistureSensorIndex[0]);
+  Log.print("), sensor2 raw=");
+  Log.print(state.moistureRaw[1]);
+  Log.print(" (");
+  Log.print(state.moistureSensorIndex[1]);
+  Log.print(") -> ");
+  Log.print(state.moistureIndex);
+  Log.print(state.moistureSensorFail ? "/100 BOTH FAILED" : state.moistureMismatch ? "/100 MISMATCH" : "/100");
+  Log.print(", ledStatus=");
+  Log.println(state.ledStatus);
 }
 
 // ---- Core: choose what is more important to show ----
@@ -71,38 +72,35 @@ static void updateStatus() {
 static void setManualLed(LedStatus s, const char* name) {
   manualMode = true;
   state.ledStatus = s;
-  Serial.print("-> LED manual: ");
-  Serial.println(name);
+  Log.print("-> LED manual: ");
+  Log.println(name);
 }
 
-// ---- Test Control via Serial ----
-static void handleSerial() {
-  if (Serial.available() == 0) return;
-  char ch = Serial.read();
-
+// ---- Test control: one command character, from the cable or from telnet ----
+static void handleCommand(char ch) {
   switch (ch) {
   case 's':
-    Serial.print("WATER: phase=");
-    Serial.print(waterPhaseName(state.waterPhase));
-    Serial.print(", needWater=");
-    Serial.print(state.needWater ? "YES" : "NO");
-    Serial.print(", pumpOn=");
-    Serial.print(state.pumpOn ? "YES" : "NO");
-    Serial.print(", attempts=");
-    Serial.print(state.waterAttempts);
-    Serial.print(", error=");
-    Serial.println(state.errorFlag ? "YES" : "NO");
+    Log.print("WATER: phase=");
+    Log.print(waterPhaseName(state.waterPhase));
+    Log.print(", needWater=");
+    Log.print(state.needWater ? "YES" : "NO");
+    Log.print(", pumpOn=");
+    Log.print(state.pumpOn ? "YES" : "NO");
+    Log.print(", attempts=");
+    Log.print(state.waterAttempts);
+    Log.print(", error=");
+    Log.println(state.errorFlag ? "YES" : "NO");
     break;
   case 't':
-    Serial.print("TANK: ");
+    Log.print("TANK: ");
     if (state.tankPercent < 0) {
-      Serial.println(state.tankSensorFail ? "SENSOR FAILED (no echo)" : "no data");
+      Log.println(state.tankSensorFail ? "SENSOR FAILED (no echo)" : "no data");
     } else {
-      Serial.print(state.tankDistanceCm, 1);
-      Serial.print(" cm to water, level ");
-      Serial.print(state.tankPercent);
-      Serial.print(" %, tankLow=");
-      Serial.println(state.tankLow ? "YES" : "NO");
+      Log.print(state.tankDistanceCm, 1);
+      Log.print(" cm to water, level ");
+      Log.print(state.tankPercent);
+      Log.print(" %, tankLow=");
+      Log.println(state.tankLow ? "YES" : "NO");
     }
     break;
   case 'm':
@@ -112,11 +110,11 @@ static void handleSerial() {
     break;
   case 'w':
     state.waterRequest = true;
-    Serial.println("-> water now (only in IDLE)");
+    Log.println("-> water now (only in IDLE)");
     break;
   case 'r':
     state.errorResetRequest = true;
-    Serial.println("-> reset error (only in ERROR)");
+    Log.println("-> reset error (only in ERROR)");
     break;
   case 'i':
     wifiOtaPrintInfo();
@@ -143,7 +141,7 @@ static void handleSerial() {
   }
   case 'a':
     manualMode = false;
-    Serial.println("-> LED auto mode");
+    Log.println("-> LED auto mode");
     break;
   case '0': setManualLed(STATUS_IDLE, "IDLE (rainbow)"); break;
   case '1': setManualLed(STATUS_NEED_WATER, "NEED_WATER"); break;
@@ -167,20 +165,24 @@ void setup() {
   profileBegin();       // before the first soil check
   wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
-  Serial.println("The system is running. Commands: s t m w r i p T a 0-6");
+  Log.println("The system is running. Commands: s t m w r i p T a 0-6");
 #if WATER_TEST_TIMING
-  Serial.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");
+  Log.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");
 #endif
 }
 
 void loop() {
   wifiOtaUpdate();      // keep first: OTA must be handled often
+  loggerUpdate();       // telnet: start server, accept client, send held-back text
   tankUpdate();
   moistureUpdate();     // before pumpUpdate: a finished result is used in the same loop
   pumpUpdate();
   updateStatus();
   ledsUpdate();
-  handleSerial();
+  // commands: from the USB cable and from the telnet client
+  while (Serial.available() > 0) handleCommand(Serial.read());
+  int c;
+  while ((c = loggerReadChar()) >= 0) handleCommand((char)c);
 
   if (printMoistureWhenReady && state.moistureSeq != printMoistureSeq) {
     printMoistureWhenReady = false;

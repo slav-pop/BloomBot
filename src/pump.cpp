@@ -3,6 +3,7 @@
 #include "pump.h"
 #include "moisture.h"
 #include "state.h"
+#include "logger.h"
 
 // ============================================================
 //  Watering state machine:
@@ -78,15 +79,15 @@ static void enterPhase(WaterPhase p) {
     soilPending = false;                   // a phase change cancels a pending check
     state.waterPhase = p;
     phaseStartedAt = millis();
-    Serial.print("WATER: -> ");
-    Serial.println(waterPhaseName(p));
+    Log.print("WATER: -> ");
+    Log.println(waterPhaseName(p));
 }
 
 static void goError(const char* reason) {
     water_pump_off();
     state.errorFlag = true;
-    Serial.print("WATER: ERROR - ");
-    Serial.println(reason);
+    Log.print("WATER: ERROR - ");
+    Log.println(reason);
     enterPhase(PHASE_ERROR);
 }
 
@@ -102,7 +103,7 @@ static void startPumping(bool manual) {
         return;
     }
     if (!manual && state.moistureIndex >= state.profile.moistMax) {
-        Serial.println("WATER: index >= moist_max - pump stays off");
+        Log.println("WATER: index >= moist_max - pump stays off");
         if (state.waterPhase != PHASE_IDLE) enterPhase(PHASE_IDLE);
         return;
     }
@@ -149,23 +150,23 @@ static bool soilResultReady() {
 // ---- the soil was measured: decide what to do ----
 static void checkSoil(bool afterWatering) {
     const Profile& p = state.profile;
-    Serial.print("WATER: soil ");
-    Serial.print(state.moistureIndex);
-    Serial.print("/100 (sensors ");
-    Serial.print(state.moistureSensorIndex[0]);
-    Serial.print(" / ");
-    Serial.print(state.moistureSensorIndex[1]);
-    Serial.print("), min/target/max ");
-    Serial.print(p.moistMin);
-    Serial.print("/");
-    Serial.print(p.moistTarget);
-    Serial.print("/");
-    Serial.println(p.moistMax);
+    Log.print("WATER: soil ");
+    Log.print(state.moistureIndex);
+    Log.print("/100 (sensors ");
+    Log.print(state.moistureSensorIndex[0]);
+    Log.print(" / ");
+    Log.print(state.moistureSensorIndex[1]);
+    Log.print("), min/target/max ");
+    Log.print(p.moistMin);
+    Log.print("/");
+    Log.print(p.moistTarget);
+    Log.print("/");
+    Log.println(p.moistMax);
 
     // Both sensors failed: do not water blind. Back to IDLE, the next
     // regular check tries again (LED shows the error via moistureSensorFail).
     if (state.moistureIndex < 0) {
-        Serial.println("WATER: no data from both moisture sensors - no watering");
+        Log.println("WATER: no data from both moisture sensors - no watering");
         state.needWater = false;
         state.waterAttempts = 0;
         if (state.waterPhase != PHASE_IDLE) enterPhase(PHASE_IDLE);
@@ -184,9 +185,9 @@ static void checkSoil(bool afterWatering) {
         if (pauseRunning()) {
             // dry again so soon after a cycle: rather sensor drift than a thirsty
             // plant -> wait until the pause is over
-            Serial.print("WATER: dry, but pause running, ");
-            Serial.print((pauseMs() - (millis() - lastCycleEndAt)) / 1000UL);
-            Serial.println(" s left");
+            Log.print("WATER: dry, but pause running, ");
+            Log.print((pauseMs() - (millis() - lastCycleEndAt)) / 1000UL);
+            Log.println(" s left");
             return;
         }
         state.waterAttempts = 0;                     // a new watering cycle begins
@@ -202,7 +203,7 @@ static void checkSoil(bool afterWatering) {
     if (state.waterAttempts < MAX_WATER_ATTEMPTS) {
         startPumping(false);
     } else if (state.moistureIndex >= p.moistMin) {
-        Serial.println("WATER: target not reached, but soil no longer dry - cycle done");
+        Log.println("WATER: target not reached, but soil no longer dry - cycle done");
         finishCycle();
     } else {
         goError("soil still dry after all attempts (hose? sensor? pump?)");

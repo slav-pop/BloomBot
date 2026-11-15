@@ -4,6 +4,7 @@
 #include "config.h"
 #include "secrets.h"
 #include "state.h"
+#include "logger.h"
 #include "pump.h"
 #include "wifi_ota.h"
 
@@ -19,8 +20,8 @@ static unsigned long lastAttemptAt = 0;
 static void connectWifi() {
   lastAttemptAt = millis();
   state.wifiConnecting = true;
-  Serial.print("WIFI: connecting to ");
-  Serial.println(WIFI_SSID);
+  Log.print("WIFI: connecting to ");
+  Log.println(WIFI_SSID);
   WiFi.disconnect();
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
@@ -30,10 +31,10 @@ static void startOta() {
   if (otaRunning) ArduinoOTA.end();
   ArduinoOTA.begin();
   otaRunning = true;
-  Serial.print("OTA: ready, upload to ");
-  Serial.print(OTA_HOSTNAME);
-  Serial.print(".local or ");
-  Serial.println(WiFi.localIP());
+  Log.print("OTA: ready, upload to ");
+  Log.print(OTA_HOSTNAME);
+  Log.print(".local or ");
+  Log.println(WiFi.localIP());
 }
 
 void wifiOtaBegin() {
@@ -47,25 +48,25 @@ void wifiOtaBegin() {
 
   ArduinoOTA.onStart([]() {
     pumpLock();                     // FIRST: pump off until reboot
-    Serial.println("OTA: start (pump locked)");
+    Log.println("OTA: start (pump locked)");
   });
   ArduinoOTA.onProgress([](unsigned int done, unsigned int total) {
     static int lastTen = -1;
     int ten = done * 10 / total;
     if (ten != lastTen) {
       lastTen = ten;
-      Serial.print("OTA: ");
-      Serial.print(ten * 10);
-      Serial.println(" %");
+      Log.print("OTA: ");
+      Log.print(ten * 10);
+      Log.println(" %");
     }
   });
   ArduinoOTA.onEnd([]() {
-    Serial.println("OTA: done, rebooting");
+    Log.println("OTA: done, rebooting");
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    Serial.print("OTA: error ");
-    Serial.print(error);
-    Serial.println(" - old firmware keeps running, pump locked until reboot");
+    Log.print("OTA: error ");
+    Log.print(error);
+    Log.println(" - old firmware keeps running, pump locked until reboot");
   });
 
   connectWifi();
@@ -79,8 +80,8 @@ void wifiOtaUpdate() {
       wasConnected = true;
       state.wifiConnected = true;
       state.wifiConnecting = false;
-      Serial.print("WIFI: connected, IP ");
-      Serial.println(WiFi.localIP());
+      Log.print("WIFI: connected, IP ");
+      Log.println(WiFi.localIP());
       startOta();
     }
     ArduinoOTA.handle();
@@ -90,7 +91,7 @@ void wifiOtaUpdate() {
   if (wasConnected) {               // just lost the connection
     wasConnected = false;
     state.wifiConnected = false;
-    Serial.println("WIFI: connection lost");
+    Log.println("WIFI: connection lost");
     connectWifi();
     return;
   }
@@ -99,18 +100,18 @@ void wifiOtaUpdate() {
 }
 
 void wifiOtaPrintInfo() {
-  Serial.print("WIFI: ");
+  Log.print("WIFI: ");
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("connected to ");
-    Serial.print(WIFI_SSID);
-    Serial.print(", IP ");
-    Serial.print(WiFi.localIP());
-    Serial.print(", RSSI ");
-    Serial.print(WiFi.RSSI());
-    Serial.print(" dBm, OTA ");
-    Serial.print(OTA_HOSTNAME);
-    Serial.println(".local");
+    Log.print("connected to ");
+    Log.print(WIFI_SSID);
+    Log.print(", IP ");
+    Log.print(WiFi.localIP());
+    Log.print(", RSSI ");
+    Log.print(WiFi.RSSI());
+    Log.print(" dBm, OTA ");
+    Log.print(OTA_HOSTNAME);
+    Log.println(".local");
   } else {
-    Serial.println("not connected");
+    Log.println("not connected");
   }
 }

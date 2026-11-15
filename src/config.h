@@ -112,3 +112,8 @@ static_assert(WATER_DOSE_ML <= DOSE_MAX_ML, "WATER_DOSE_ML is bigger than DOSE_M
 // SSID and passwords live in src/secrets.h (not in git)
 #define OTA_HOSTNAME   "bloombot"   // -> bloombot.local
 #define WIFI_RETRY_MS  15000UL      // next connection attempt if Wi-Fi is down
+
+// ============ Telnet log ==============
+// Log output + commands over Wi-Fi, see logger.h
+#define TELNET_PORT      23
+#define LOG_BUFFER_SIZE  1024   // text held back while the pump runs

@@ -100,7 +100,7 @@ Wird mit jeder Abfrage gesendet.
 {
   "fw": "0.3.0",
   "uptime_s": 12345,
-  "moisture_pct": 42,
+  "moisture_index": 42,
   "moisture_raw": 2900,
   "tank_pct": 63,
   "tank_low": false,
@@ -121,7 +121,7 @@ Wird mit jeder Abfrage gesendet.
 
 | Feld | Bedeutung |
 |---|---|
-| `moisture_pct` | 0–100, `-1` = keine Daten. Skala nach Kalibrierung, siehe Abschnitt 8 |
+| `moisture_index` | Feuchte-Index 0–100 (keine physikalischen Prozent), `-1` = keine Daten. Skala siehe Abschnitt 8 |
 | `tank_pct` | 0–100, `-1` = keine Daten oder Sensorfehler |
 | `tank_low` | true unter 20 %, wieder false über 25 % (Hysterese) |
 | `tank_capacity_ml` | Tankvolumen aus `config.h` (`TANK_CAPACITY_ML`) |
@@ -138,13 +138,13 @@ Wird mit jeder Abfrage gesendet.
 Der Bot macht daraus Telegram-Nachrichten. Das Gerät sendet jedes Ereignis einmal.
 
 ```json
-{ "type": "watered", "ml": 120, "moisture_pct": 38 }
+{ "type": "watered", "ml": 120, "moisture_index": 38 }
 ```
 
 | `type` | Zusatzfelder | Beispielnachricht des Bots |
 |---|---|---|
 | `boot` | `fw` | (nur ins Log) |
-| `watered` | `ml`, `moisture_pct` | (nur Log / Verlauf; keine Nachricht, um nicht zu spammen) |
+| `watered` | `ml`, `moisture_index` | (nur Log / Verlauf; keine Nachricht, um nicht zu spammen) |
 | `tank_low` | `tank_pct` | „Wenig Wasser im Tank (~2 Tage). Bitte nachfüllen“ |
 | `tank_empty` | – | „Die Pflanze braucht Wasser, aber der Tank ist leer!“ |
 | `tank_refilled` | `tank_pct` | „Tank aufgefüllt, danke. Das Wasser reicht für etwa 9–12 Tage“ |
@@ -184,7 +184,7 @@ Das Gerät kennt die Pflanzendatenbank **nicht**. Der Server berechnet einige Za
 | `moist_min` | unterhalb dieses Werts beginnt das Gießen | `soil_moisture.minimum_before_watering_percent` | 0–100 |
 | `moist_target` | gibt Portionen, bis dieser Wert erreicht ist | `soil_moisture.recommended_target_percent` (im Modus `eco` niedriger, Abschnitt 7) | > `moist_min` |
 | `moist_max` | ab diesem Wert schaltet die Pumpe niemals ein | `soil_moisture.maximum_safe_percent` | > `moist_target`, ≤ 100 |
-| `dose_ml` | Volumen einer Portion | `pump_calculation`: `base_ml_per_liter_of_soil × pot_liters`, begrenzt auf `minimum_water_ml … maximum_water_ml` | 10–500 |
+| `dose_ml` | Volumen einer Portion | `pump_calculation`: `base_ml_per_liter_of_soil × pot_liters`, begrenzt auf `minimum_water_ml … maximum_water_ml` und auf 150 | 10–150 (die Pumpe schafft in ihrem Zeitlimit von 10 s nicht mehr, `DOSE_MAX_ML`) |
 | `min_pause_h` | Mindestzeit zwischen zwei Gießzyklen (Schutz vor Sensordrift) | `watering_cycle.minimum_days × 24 × 0,5` | 0–720 |
 | `name` | nur für Anzeige und Logs, max. 31 Zeichen | `common_name` | – |
 
@@ -281,9 +281,11 @@ die Pumpe schaltet niemals ein, wenn: Tank leer (≤ 5 %), Feuchte ≥ moist_max
 oder das Laufzeitlimit der Pumpe überschritten würde
 ```
 
-**Feuchteskala:** Der Sensor wird in echter Erde kalibriert
-(0 % = trockene Erde, 100 % = frisch gegossen und abgetropft). Die Prozentwerte aus der DB
-werden auf diese Skala angewendet. Die ersten Tests zeigen, ob die DB-Werte korrigiert werden müssen.
+**Feuchteskala:** Die Bodenfeuchte ist ein **Feuchte-Index von 0 bis 100**, keine physikalischen
+Prozent. Ein resistiver Sensor misst die Leitfähigkeit, nicht den Wassergehalt. Er wird in echter
+Erde kalibriert: 0 = trockene Erde, 100 = frisch gegossen und abgetropft. Die Werte aus der DB
+(`moist_min`, `moist_target`, `moist_max`) werden auf diesen Index angewendet. Die ersten Tests
+zeigen, ob die DB-Werte korrigiert werden müssen.
 
 ## 9. Offene Fragen
 

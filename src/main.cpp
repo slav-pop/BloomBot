@@ -6,15 +6,18 @@
 #include "moisture.h"
 #include "pump.h"
 #include "wifi_ota.h"
+#include "profile.h"
 
 // ============================================================
 //  Commands in the Serial Monitor:
 //    s     - watering status
 //    t     - tank data
 //    m     - measure soil now
-//    w     - water now (goes through all safety checks)
+//    w     - water now (manual test: checks the tank, ignores moist_max and the pause)
 //    r     - reset watering error
 //    i     - Wi-Fi: IP address and signal
+//    p     - show the plant profile
+//    T     - apply a test profile (Monstera) and save it in flash
 //    a     - LED: automatic status (normal mode)
 //    0..6  - LED: force a status (test):
 //            0=rainbow 1=need water 2=watering 3=low water
@@ -118,6 +121,26 @@ static void handleSerial() {
   case 'i':
     wifiOtaPrintInfo();
     break;
+  case 'p':
+    profilePrint();
+    break;
+  case 'T': {
+    // test profile as the server would send it (Monstera, 2 l pot),
+    // with a new version so it really counts as "new"
+    Profile t;
+    profileDefaults(t);
+    t.ver = state.profile.ver + 1;
+    t.plantId = 9001;
+    strncpy(t.name, "Swiss cheese plant", sizeof(t.name) - 1);
+    t.moistMin = 30;
+    t.moistTarget = 50;
+    t.moistMax = 70;
+    t.doseMl = 150;
+    t.minPauseH = 84;
+    profileApply(t, nullptr);
+    profilePrint();
+    break;
+  }
   case 'a':
     manualMode = false;
     Serial.println("-> LED auto mode");
@@ -141,9 +164,10 @@ void setup() {
   ledsBegin();
   tankBegin();
   moistureBegin();
+  profileBegin();       // before the first soil check
   wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
-  Serial.println("The system is running. Commands: s t m w r i a 0-6");
+  Serial.println("The system is running. Commands: s t m w r i p T a 0-6");
 #if WATER_TEST_TIMING
   Serial.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");
 #endif

@@ -53,7 +53,6 @@
 #define WET_VAL_1 1500  // sensor 1 in a glass of water
 #define DRY_VAL_2 4095  // sensor 2 in air
 #define WET_VAL_2 1500  // sensor 2 in a glass of water
-#define THRESHOLD_DRY 30.0f  // randomly picked value for now -> is there a better one or depending on plant ?
 // The sensors get power only while measuring: less corrosion of the probes
 #define MOISTURE_POWER_ON_MS  300  // settle time after power on (30 ms was too short: dry read ~2700)
 #define MOISTURE_SENSORS      2    // two sensors in one pot
@@ -82,7 +81,7 @@
 
 #define FIRST_CHECK_DELAY_MS  3000UL   // first soil check after boot (tank needs data first)
 #define PUMP_FLOW_ML_PER_S    23       // measured: ~47 ml in 2 s
-#define WATER_DOSE_ML         50       // one portion. TODO: from plant DB
+#define WATER_DOSE_ML         50       // one portion without a profile (default)
 #define MAX_WATER_ATTEMPTS    3        // portions in a row before ERROR (INTEGRATION: max 3)
 #define PUMP_MAX_ON_MS        10000UL  // hard safety limit for one pump run
 #define TANK_EMPTY_PERCENT    5        // at or below: pump is blocked (no dry running)
@@ -93,6 +92,21 @@
 static_assert(DOSE_MAX_ML * 1000UL / PUMP_FLOW_ML_PER_S < PUMP_MAX_ON_MS,
               "DOSE_MAX_ML does not fit into PUMP_MAX_ON_MS");
 static_assert(WATER_DOSE_ML <= DOSE_MAX_ML, "WATER_DOSE_ML is bigger than DOSE_MAX_ML");
+
+// ============ Plant profile ===========
+// Used until the server sends a profile (and if the stored one is invalid).
+// Moisture values are the index 0..100.
+#define DEFAULT_MOIST_MIN     30   // start watering below this
+#define DEFAULT_MOIST_TARGET  50   // give portions until this is reached
+#define DEFAULT_MOIST_MAX     70   // never pump at or above this
+#define DEFAULT_MIN_PAUSE_H   0    // no pause between cycles without a profile
+#define PROFILE_MAX_PAUSE_H   720  // INTEGRATION: min_pause_h 0..720
+// min_pause_h is given in hours. In test mode an "hour" lasts one second.
+#if WATER_TEST_TIMING
+  #define PAUSE_UNIT_MS  1000UL
+#else
+  #define PAUSE_UNIT_MS  3600000UL
+#endif
 
 // ============ Wi-Fi / OTA =============
 // SSID and passwords live in src/secrets.h (not in git)

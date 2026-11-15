@@ -231,6 +231,12 @@ Der Benutzer **kann nicht** aus der Ferne gießen (Abschnitt 1). Es bleiben nur 
 | `cmd` | Aktion | Abgelehnt, wenn |
 |---|---|---|
 | `reset` | `ERROR` verlassen und sofort den Boden prüfen | Phase ist nicht `ERROR` |
+| `factory_reset` | Profil aus dem Flash löschen, zurück zu den Standardwerten | nie |
+
+`factory_reset` kommt, wenn das Gerät im Bot zurückgesetzt wurde („Gerät zurücksetzen“
+oder Admin-Befehl `/admin_reset`) und auf dem Server kein Profil mehr hat. Der Server sendet
+den Befehl bei jeder Abfrage, solange das Gerät noch `profile_ver` > 0 meldet. So kommt er auch an,
+wenn das Gerät während des Zurücksetzens offline war.
 
 Gießen für Test und Vorführung: Serial-Befehl `w`, nicht über den Bot.
 

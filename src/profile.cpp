@@ -120,6 +120,17 @@ void profileBegin() {
     }
 }
 
+
+// ---- forget the profile: erase it from flash, back to the defaults ----
+void profileFactoryReset() {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);      // open the "folder" for writing
+    prefs.clear();                          // delete all keys in it (schema + data)
+    prefs.end();
+    profileDefaults(state.profile);
+    Log.println("PROFILE: erased, back to defaults (factory reset)");
+}
+
 // ---- serial 'p': print the profile in use ----
 void profilePrint() {
     const Profile& p = state.profile;

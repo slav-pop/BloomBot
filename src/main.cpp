@@ -22,6 +22,7 @@
 //    n     - send the status to the server now
 //    p     - show the plant profile
 //    e     - show the events waiting for the server
+//    F     - forget the plant profile (factory reset), back to defaults
 //    T     - apply a test profile (Monstera) and save it in flash
 //    a     - LED: automatic status (normal mode)
 //    0..6  - LED: force a status (test):
@@ -146,6 +147,9 @@ static void handleCommand(char ch) {
   case 'e':
     eventPrintAll();
     break;
+  case 'F':
+    profileFactoryReset();   // same as the server command "factory_reset"
+    break;
   case 'T': {
     // test profile as the server would send it (Monstera, 2 l pot),
     // with a new version so it really counts as "new"
@@ -189,7 +193,7 @@ void setup() {
   profileBegin();       // before the first soil check
   wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
-  Log.println("The system is running. Commands: s t m w r i n p T e a 0-6");
+  Log.println("The system is running. Commands: s t m w r i n p T e F a 0-6");
   eventPush("boot", 0, 0, FW_VERSION);
 #if WATER_TEST_TIMING
   Log.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");

@@ -4,6 +4,8 @@
 // Secrets:  DEVICE_KEY, TELEGRAM_TOKEN, TELEGRAM_SECRET
 
 const POLL_S = 60;        // demo: 60 s, normal use: 600
+const DEFAULT_DEVICE_NAME = "BloomBot";   // name after "Gerät zurücksetzen"
+const MAX_NAME_LEN = 24;
 const COMMAND_TTL_S = 30 * 60;   // commands older than 30 min are dropped, not sent (Integration.md section 2)
 
 // Protection
@@ -322,7 +324,7 @@ async function assignPlant(env, dev, plantId) {
   ]);
 
   return [
-    `BloomBot „${dev.name}“ kümmert sich jetzt um: ${plantName(plant)} (${s.sci})`,
+    `${devLabel(dev.name)} kümmert sich jetzt um: ${plantName(plant)} (${s.sci})`,
     `Topf: ${plant.pot_liters ?? DEFAULT_POT_L} l`,
     `Gießen bei Bodenfeuchte unter ${profile.moist_min}, bis ${profile.moist_target}, nie über ${profile.moist_max} (von 100)`,
     `Portion: ${profile.dose_ml} ml, frühestens alle ${profile.min_pause_h} h`,
@@ -411,9 +413,12 @@ async function onText(env, msg) {
         "Neues Gerät: QR-Code auf dem Gerät scannen oder /link und der Code vom Aufkleber.\n" +
         "„Pflanze“ – Pflanze wählen, „Topf“ – Topfgröße, „Teilen“ – jemandem Zugriff geben, " +
         "„Status“ – aktueller Zustand.\n" +
+        "/name – dein Gerät umbenennen, z. B. /name Küche\n" +
         "/konto_loeschen – dein Konto und alle deine Daten löschen.", KEYBOARD);
     case "/link":
       return linkDevice(env, uid, arg);
+    case "/name":
+      return renameDevice(env, uid, arg);
     case "/konto_loeschen":
       return send(env, uid,
         "Dein Konto wirklich löschen? Deine Pflanzen und Zugriffe werden gelöscht, " +
@@ -493,7 +498,7 @@ async function onCallback(env, q) {
     if (!plant) return;
     const other = await q1(env, "SELECT * FROM devices WHERE plant_id = ?1 AND id <> ?2", plant.id, dev.id);
     if (other && kind === "use") {
-      return send(env, uid, `${plantName(plant)} steht gerade an BloomBot „${other.name}“. Umstellen?`, {
+      return send(env, uid, `${plantName(plant)} steht gerade an ${devLabel(other.name)}. Umstellen?`, {
         inline_keyboard: [[{ text: "Ja, umstellen", callback_data: `usef:${plant.id}` }]],
       });
     }
@@ -513,6 +518,11 @@ async function onCallback(env, q) {
 
   if (kind === "cancel") return send(env, uid, "Abgebrochen.", KEYBOARD);
 
+  // the name is typed as a command, so no "waiting for text" state is needed
+  if (kind === "rename") {
+    return send(env, uid, `Schreib /name und den neuen Namen (max. ${MAX_NAME_LEN} Zeichen), z. B. /name Küche`);
+  }
+
   // "Gerät zurücksetzen": step 1 asks, step 2 ("devreset2") does it. Owner only
   if (kind === "devreset" || kind === "devreset2") {
     const deviceId = a;
@@ -522,13 +532,13 @@ async function onCallback(env, q) {
     if (!own) return send(env, uid, "Das kann nur der Besitzer des Geräts.");
     if (kind === "devreset") {
       return send(env, uid,
-        `BloomBot „${own.name}“ wirklich zurücksetzen? Alle verlieren den Zugriff, ` +
+        `${devLabel(own.name)} wirklich zurücksetzen? Alle verlieren den Zugriff, ` +
         "die Pflanze wird abgemeldet, das Gerät ist danach wie neu und kann wieder gekoppelt werden.",
         { inline_keyboard: [[{ text: "Ja, zurücksetzen", callback_data: `devreset2:${deviceId}` },
                              { text: "Abbrechen", callback_data: "cancel" }]] });
     }
     await resetDevice(env, deviceId, uid);
-    return send(env, uid, `BloomBot „${own.name}“ ist zurückgesetzt.`, KEYBOARD);
+    return send(env, uid, `${devLabel(own.name)} ist zurückgesetzt.`, KEYBOARD);
   }
 
   if (kind === "delacc") {
@@ -578,7 +588,9 @@ async function linkDevice(env, uid, code) {
     `INSERT INTO device_access (device_id, user_id, role, created_at) VALUES (?1, ?2, 'owner', ?3)
      ON CONFLICT(device_id, user_id) DO UPDATE SET role = 'owner'`,
     dev.id, uid, now());
-  return send(env, uid, `Gekoppelt: BloomBot „${dev.name}“. Wähle jetzt die Pflanze mit „Pflanze“.`, KEYBOARD);
+  return send(env, uid,
+    `Gekoppelt: ${devLabel(dev.name)}. Wähle jetzt die Pflanze mit „Pflanze“.\n` +
+    "Tipp: Mit /name gibst du dem Gerät einen eigenen Namen, z. B. /name Küche", KEYBOARD);
 }
 
 // ---- device "as after purchase": nobody has access, no plant, no profile ----
@@ -594,12 +606,12 @@ async function resetDevice(env, deviceId, exceptUid = null) {   // exceptUid: wh
     env.DB.prepare("DELETE FROM commands WHERE device_id = ?1").bind(deviceId),
     env.DB.prepare(
       `UPDATE devices SET plant_id = NULL, profile_json = NULL, mode = 'normal',
-         vacation_until = NULL, forecast_since = NULL WHERE id = ?1`
-    ).bind(deviceId),
+         vacation_until = NULL, forecast_since = NULL, name = ?2 WHERE id = ?1`
+    ).bind(deviceId, DEFAULT_DEVICE_NAME),
   ]);
   for (const u of users) {
     if (u.user_id === exceptUid) continue;
-    await send(env, u.user_id, `BloomBot „${dev ? dev.name : deviceId}“ wurde zurückgesetzt. Du hast keinen Zugriff mehr.`);
+    await send(env, u.user_id, `${devLabel(dev ? dev.name : deviceId)} wurde zurückgesetzt. Du hast keinen Zugriff mehr.`);
   }
 }
 
@@ -636,7 +648,23 @@ async function adminReset(env, uid, deviceId) {
   const dev = await q1(env, "SELECT id, name, pair_code FROM devices WHERE id = ?1", deviceId);
   if (!dev) return send(env, uid, `Gerät „${deviceId}“ gibt es nicht.`);
   await resetDevice(env, dev.id);
-  return send(env, uid, `Admin: BloomBot „${dev.name}“ (${dev.id}) ist zurückgesetzt. Koppel-Code: ${dev.pair_code}`);
+  return send(env, uid, `Admin: ${devLabel(dev.name)} (${dev.id}) ist zurückgesetzt. Koppel-Code: ${dev.pair_code}`);
+}
+
+// "BloomBot „Küche“", or just "BloomBot" while the device has the default name
+function devLabel(name) {
+  return !name || name === DEFAULT_DEVICE_NAME ? DEFAULT_DEVICE_NAME : `BloomBot „${name}“`;
+}
+
+// ---- /name <new name>: the owner renames their device ----
+async function renameDevice(env, uid, name) {
+  const dev = await requireOwner(env, uid);
+  if (!dev) return;
+  name = (name || "").replace(/\s+/g, " ").trim();
+  if (!name) return send(env, uid, "Schreib /name und den neuen Namen, z. B. /name Küche");
+  if (name.length > MAX_NAME_LEN) return send(env, uid, `Der Name ist zu lang (max. ${MAX_NAME_LEN} Zeichen).`);
+  await run(env, "UPDATE devices SET name = ?1 WHERE id = ?2", name, dev.id);
+  return send(env, uid, `Dein Gerät heißt jetzt „${name}“.`, KEYBOARD);
 }
 
 async function choosePlant(env, uid) {
@@ -711,7 +739,7 @@ async function acceptInvite(env, from, code) {
   }
   const dev = await q1(env, "SELECT * FROM devices WHERE id = ?1", inv.device_id);
   const has = await q1(env, "SELECT role FROM device_access WHERE device_id = ?1 AND user_id = ?2", dev.id, uid);
-  if (has) return send(env, uid, `Du hast schon Zugriff auf BloomBot „${dev.name}“.`, KEYBOARD);
+  if (has) return send(env, uid, `Du hast schon Zugriff auf ${devLabel(dev.name)}.`, KEYBOARD);
 
   await env.DB.batch([
     env.DB.prepare(
@@ -722,9 +750,9 @@ async function acceptInvite(env, from, code) {
 
   const owner = await q1(env, "SELECT user_id FROM device_access WHERE device_id = ?1 AND role = 'owner'", dev.id);
   const name = from.first_name || from.username || String(uid);
-  if (owner) await send(env, owner.user_id, `${name} hat jetzt Zugriff auf BloomBot „${dev.name}“.`);
+  if (owner) await send(env, owner.user_id, `${name} hat jetzt Zugriff auf ${devLabel(dev.name)}.`);
   return send(env, uid,
-    `Du hast jetzt Zugriff auf BloomBot „${dev.name}“. Du bekommst seine Benachrichtigungen, ` +
+    `Du hast jetzt Zugriff auf ${devLabel(dev.name)}. Du bekommst seine Benachrichtigungen, ` +
     "„Status“ zeigt den aktuellen Zustand.", KEYBOARD);
 }
 
@@ -740,7 +768,7 @@ async function statusText(env, uid) {
   const blocks = [];
   const buttons = [];
   for (const d of devices) {
-    const lines = [`BloomBot „${d.name}“${d.role === "member" ? " (geteilt mit dir)" : ""}`];
+    const lines = [`${devLabel(d.name)}${d.role === "member" ? " (geteilt mit dir)" : ""}`];
     const plant = d.plant_id != null ? await q1(env, "SELECT * FROM my_plants WHERE id = ?1", d.plant_id) : null;
     lines.push(plant ? `Pflanze: ${plantTitle(plant)}` : "Pflanze: nicht gewählt");
 
@@ -763,7 +791,10 @@ async function statusText(env, uid) {
       }
     }
     if (d.role === "owner") {
-      buttons.push([{ text: `Gerät zurücksetzen („${d.name}“)`, callback_data: `devreset:${d.id}` }]);
+      buttons.push([
+        { text: "Umbenennen", callback_data: `rename:${d.id}` },
+        { text: "Gerät zurücksetzen", callback_data: `devreset:${d.id}` },
+      ]);
     }
     blocks.push(lines.join("\n"));
   }

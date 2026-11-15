@@ -6,3 +6,5 @@
 .vscode/
 DB/
 src/secrets.h
+STATUS.md
+DECISIONS.md

@@ -17,11 +17,20 @@
 // ============================================================
 //  net.cpp - see net.h for the overview
 //
-//  Blocking: one HTTPS request stops loop() for 0.5-2 s (more if the
-//  server does not answer, at most NET_CONNECT_TIMEOUT_MS + NET_TIMEOUT_MS).
-//  The LED ring freezes for that moment - decided on purpose, see
-//  Integration.md section 2. To keep each freeze short, netUpdate() sends
-//  at most ONE request per loop() run.
+//  Blocking: an HTTPS request stops loop() - the LED ring freezes for that
+//  moment (decided on purpose, see Integration.md section 2). To keep each
+//  freeze short, netUpdate() sends at most ONE request per loop() run.
+//
+//  Keep-alive (why requests are fast most of the time):
+//    Opening a new HTTPS connection takes ~4 s on the ESP32: the TLS
+//    handshake checks the certificate chain (ECDSA P-384, computed in
+//    software). So the connection is NOT closed after a request: 'tls' and
+//    'http' below are kept, and the next request uses the same, already
+//    checked connection (a few hundred ms).
+//    The server closes an idle connection after a while. Then the next
+//    request opens a new one (4 s again). If the kept connection turns out
+//    to be dead only while sending, the request is repeated once at once
+//    with a new connection.
 // ============================================================
 
 // Stop the build if the server settings are missing in secrets.h
@@ -37,28 +46,51 @@ static bool wasConnected = false;         // Wi-Fi state in the previous loop
 static bool clockStarted = false;         // configTime() was called
 static int lastPollCode = 0;              // HTTP result of the last poll (for 'i')
 
-// ---- one HTTPS POST with a JSON body ----
-// Returns the HTTP status code (200 = OK) or a negative number for a
-// connection error. The answer of the server is written into 'response'.
-static int postJson(const char* path, const char* body, size_t bodyLen, String& response) {
-  WiFiClientSecure tls;
-  tls.setCACert(ROOT_CA_CERTS);           // accept only a server signed by these roots (certs.h)
+// Kept between requests (keep-alive), see the top of this file
+static WiFiClientSecure tls;              // the encrypted connection to the server
+static HTTPClient http;                   // HTTP on top of it
+static bool caLoaded = false;             // root certificates given to 'tls' (once)
 
-  HTTPClient http;
+// ---- one HTTPS POST over the kept connection (or a new one if there is none) ----
+static int postOnce(const char* path, const char* body, size_t bodyLen, String& response) {
+  if (!caLoaded) {
+    tls.setCACert(ROOT_CA_CERTS);         // accept only a server signed by these roots (certs.h)
+    caLoaded = true;
+  }
   String url = String(SERVER_URL) + "/api/device/" + DEVICE_ID + path;
-  if (!http.begin(tls, url)) {
+  if (!http.begin(tls, url)) {            // uses the open connection if there is one
     Log.println("NET: bad URL, check SERVER_URL in secrets.h");
     return -100;
   }
+  http.setReuse(true);                    // keep-alive: do not close after the answer
   http.setConnectTimeout(NET_CONNECT_TIMEOUT_MS);
   http.setTimeout(NET_TIMEOUT_MS);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " DEVICE_KEY);   // the device key, see Integration.md section 2
 
-  unsigned long startedAt = millis();
   int code = http.POST((uint8_t*)body, bodyLen);
   if (code > 0) response = http.getString();
-  http.end();
+  http.end();                             // with setReuse(true) the connection stays open
+  return code;
+}
+
+// ---- one HTTPS POST with a JSON body ----
+// Returns the HTTP status code (200 = OK) or a negative number for a
+// connection error. The answer of the server is written into 'response'.
+static int postJson(const char* path, const char* body, size_t bodyLen, String& response) {
+  unsigned long startedAt = millis();
+  bool reused = tls.connected();          // is there still an open connection from before?
+  int code = postOnce(path, body, bodyLen, response);
+
+  if (code < 0 && reused) {
+    // The kept connection was already closed by the server - we only
+    // noticed it while sending. Repeat once with a new connection.
+    Log.println("NET: kept connection was closed by the server, reconnecting");
+    tls.stop();
+    reused = false;
+    code = postOnce(path, body, bodyLen, response);
+  }
+  if (code < 0) tls.stop();               // after an error: start clean next time
 
   Log.print("NET: ");
   Log.print(path);
@@ -71,7 +103,8 @@ static int postJson(const char* path, const char* body, size_t bodyLen, String& 
   }
   Log.print(", ");
   Log.print(millis() - startedAt);
-  Log.println(" ms");
+  Log.print(" ms");
+  Log.println(reused ? " (kept connection)" : " (new connection)");
   return code;
 }
 
@@ -239,6 +272,7 @@ void netUpdate() {
       clockStarted = true;
     }
   }
+  if (!connected && wasConnected) tls.stop();   // Wi-Fi lost: the kept connection is dead
   wasConnected = connected;
   if (!connected) return;
 

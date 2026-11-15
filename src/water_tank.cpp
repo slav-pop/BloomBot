@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include "config.h"
 #include "state.h"
+#include "logger.h"
+#include "events.h"
 #include "water_tank.h"
 
 // ============================================================
@@ -90,7 +92,8 @@ void tankUpdate() {
       state.tankDistanceCm = -1;
       state.tankPercent = -1;              // pump.cpp: -1 = no water -> pump blocked
       samples[0] = samples[1] = samples[2] = -1;
-      Serial.println("TANK: sensor failed (no echo), level unknown, pump blocked");
+      Log.println("TANK: sensor failed (no echo), level unknown, pump blocked");
+      eventPush("error", 0, 0, "sensor_tank");
     }
     return;
   }
@@ -98,7 +101,8 @@ void tankUpdate() {
   failCount = 0;
   if (state.tankSensorFail) {
     state.tankSensorFail = false;
-    Serial.println("TANK: sensor OK again");
+    Log.println("TANK: sensor OK again");
+    eventPush("error_cleared", 0, 0, "sensor_tank");
   }
 
   samples[sampleIndex] = d;
@@ -119,7 +123,9 @@ void tankUpdate() {
   // Hysteresis for the "low water" flag
   if (!state.tankLow && state.tankPercent < TANK_LOW_ON_PERCENT) {
     state.tankLow = true;
+    eventPush("tank_low", state.tankPercent);
   } else if (state.tankLow && state.tankPercent > TANK_LOW_OFF_PERCENT) {
     state.tankLow = false;
+    eventPush("tank_refilled", state.tankPercent);
   }
 }

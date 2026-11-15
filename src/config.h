@@ -4,6 +4,8 @@
 // all PIN changes only here!!!
 // ======================================================
 
+#define FW_VERSION  "0.4.0"   // firmware version, sent to the server (boot event, status)
+
 // ============ PINs ==================
 #define TRIG_PIN       12   // ultrasonic sensor: trigger
 #define ECHO_PIN       14   // ultrasonic sensor: echo
@@ -112,3 +114,21 @@ static_assert(WATER_DOSE_ML <= DOSE_MAX_ML, "WATER_DOSE_ML is bigger than DOSE_M
 // SSID and passwords live in src/secrets.h (not in git)
 #define OTA_HOSTNAME   "bloombot"   // -> bloombot.local
 #define WIFI_RETRY_MS  15000UL      // next connection attempt if Wi-Fi is down
+
+// ============ Telnet log ==============
+// Log output + commands over Wi-Fi, see logger.h
+#define TELNET_PORT      23
+#define LOG_BUFFER_SIZE  1024   // text held back while the pump runs
+
+// ============ Events =================
+#define EVENT_QUEUE_SIZE  5     // events waiting for the server (Integration.md: up to 5)
+
+// ============ Server connection ======
+// URL, device id and key live in src/secrets.h
+#define NET_POLL_DEFAULT_S      600     // status every 10 min, until the server says otherwise
+#define NET_POLL_MIN_S          60      // poll_s from the server is only accepted in 60..3600
+#define NET_POLL_MAX_S          3600
+#define NET_CONNECT_TIMEOUT_MS  4000    // give up connecting after 4 s (LED freeze at most this long)
+#define NET_TIMEOUT_MS          4000    // give up waiting for the answer after 4 s
+#define NET_JSON_SIZE           768     // bytes for the status JSON
+#define TANK_CAPACITY_ML        2000    // TBD: real tank volume, sent to the server for the water forecast

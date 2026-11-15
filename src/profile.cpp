@@ -3,6 +3,7 @@
 #include <string.h>
 #include "config.h"
 #include "state.h"
+#include "logger.h"
 #include "profile.h"
 
 // ============================================================
@@ -68,8 +69,8 @@ bool profileApply(const Profile& p, const char** reason) {
     const char* err = profileCheck(p);
     if (err) {                              // err is not nullptr = a rule is broken
         if (reason) *reason = err;
-        Serial.print("PROFILE: rejected - ");
-        Serial.println(err);
+        Log.print("PROFILE: rejected - ");
+        Log.println(err);
         return false;                       // the old profile stays untouched
     }
 
@@ -80,8 +81,8 @@ bool profileApply(const Profile& p, const char** reason) {
     prefs.end();                            // close
 
     state.profile = p;                      // from now on the pump uses the new numbers
-    Serial.print("PROFILE: applied and saved, ver ");
-    Serial.println(p.ver);
+    Log.print("PROFILE: applied and saved, ver ");
+    Log.println(p.ver);
     return true;
 }
 
@@ -112,34 +113,34 @@ void profileBegin() {
         stored.name[sizeof(stored.name) - 1] = '\0';
         stored.mode[sizeof(stored.mode) - 1] = '\0';
         state.profile = stored;
-        Serial.print("PROFILE: loaded from flash, ver ");
-        Serial.println(stored.ver);
+        Log.print("PROFILE: loaded from flash, ver ");
+        Log.println(stored.ver);
     } else {
-        Serial.println("PROFILE: none stored, using defaults");
+        Log.println("PROFILE: none stored, using defaults");
     }
 }
 
 // ---- serial 'p': print the profile in use ----
 void profilePrint() {
     const Profile& p = state.profile;
-    Serial.print("PROFILE: ver ");
-    Serial.print(p.ver);
-    Serial.print(p.ver == 0 ? " (defaults)" : "");
-    Serial.print(", plant ");
-    Serial.print(p.plantId);
-    Serial.print(" \"");
-    Serial.print(p.name);
-    Serial.print("\", mode ");
-    Serial.print(p.mode);
-    Serial.print(", moisture min/target/max ");
-    Serial.print(p.moistMin);
-    Serial.print("/");
-    Serial.print(p.moistTarget);
-    Serial.print("/");
-    Serial.print(p.moistMax);
-    Serial.print(", dose ");
-    Serial.print(p.doseMl);
-    Serial.print(" ml, min pause ");
-    Serial.print(p.minPauseH);
-    Serial.println(WATER_TEST_TIMING ? " h (TEST: counted as seconds)" : " h");
+    Log.print("PROFILE: ver ");
+    Log.print(p.ver);
+    Log.print(p.ver == 0 ? " (defaults)" : "");
+    Log.print(", plant ");
+    Log.print(p.plantId);
+    Log.print(" \"");
+    Log.print(p.name);
+    Log.print("\", mode ");
+    Log.print(p.mode);
+    Log.print(", moisture min/target/max ");
+    Log.print(p.moistMin);
+    Log.print("/");
+    Log.print(p.moistTarget);
+    Log.print("/");
+    Log.print(p.moistMax);
+    Log.print(", dose ");
+    Log.print(p.doseMl);
+    Log.print(" ml, min pause ");
+    Log.print(p.minPauseH);
+    Log.println(WATER_TEST_TIMING ? " h (TEST: counted as seconds)" : " h");
 }

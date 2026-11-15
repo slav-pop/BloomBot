@@ -1,0 +1,28 @@
+// ============================================================
+//  wrangler.jsonc - settings of the Cloudflare Worker "bloombot"
+//
+//  Cloudflare deploys this folder automatically on every push to main
+//  (Workers Builds: Worker -> Settings -> Build, root directory "server",
+//  deploy command "npx wrangler deploy").
+//  => Do NOT edit the code in the browser editor any more: the next push
+//     would overwrite it. Change server/worker.js here, commit, push.
+//
+//  Secrets (DEVICE_KEY, TELEGRAM_TOKEN, TELEGRAM_SECRET) are NOT here:
+//  they stay in the Cloudflare dashboard and are kept on every deploy.
+//  Database changes (new tables) are still done by hand in the D1 console;
+//  schema.sql describes the current tables.
+// ============================================================
+{
+  "name": "bloombot",                 // must be the existing Worker name, otherwise a new Worker is created
+  "main": "worker.js",
+  "compatibility_date": "2026-11-09",    // copy from Worker -> Settings -> Runtime -> Compatibility date
+  "d1_databases": [
+    {
+      "binding": "DB",                // the name the code uses: env.DB
+      "database_name": "bloombot",
+      "database_id": "faeffcc6-ec93-4ad7-80f2-c57d6d332243"        // copy from Storage & databases -> D1 -> bloombot -> Database ID
+    }
+  ],
+  "keep_vars": true,                  // keep plain variables set in the dashboard
+  "observability": { "enabled": true } // keep the logs (Worker -> Observability)
+}

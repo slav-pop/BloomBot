@@ -62,6 +62,11 @@ struct SystemState {
   bool needWater = false;
   bool pumpOn = false;
   uint8_t waterAttempts = 0;
+  const char* errorReason = nullptr;   // why PHASE_ERROR: "still_dry" / "pump_timeout"; nullptr = no error
+  uint32_t totalPumpedMl = 0;          // ml pumped since boot (server computes the consumption from it)
+  uint16_t lastDoseMl = 0;             // ml of the last pump run
+  unsigned long lastWateredAt = 0;     // millis() at the end of the last pump run
+  bool wateredSinceBoot = false;       // false: lastWateredAt has no meaning yet
 
   // ---- requests from the user (serial now, web/bot later) ----
   // main.cpp sets them to true, pump.cpp handles and clears them

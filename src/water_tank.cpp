@@ -22,6 +22,8 @@ static unsigned long lastPumpActiveAt = 0;   // when pump was last active
 static float samples[3] = { -1, -1, -1};
 static uint8_t sampleIndex = 0;
 
+static uint8_t failCount = 0;                // failed readings in a row
+
 // ---- one "raw" distance measurement, cm; -1 for an error ----
 static float readDistanceOnce() {
   digitalWrite(TRIG_PIN, LOW);     // PIN reset
@@ -79,8 +81,24 @@ void tankUpdate() {
 
   float d = readDistanceOnce();
   if (d < 0) {
-    // If errors occur in a row, can add a counter and a "sensor failed" status here later.
+    // One bad reading is normal (echo lost). Many in a row = sensor broken
+    // or disconnected: then the old value must not stay in 'state',
+    // otherwise the pump keeps trusting a level that is no longer measured.
+    if (failCount < 255) failCount++;
+    if (failCount >= TANK_MAX_FAILS && !state.tankSensorFail) {
+      state.tankSensorFail = true;
+      state.tankDistanceCm = -1;
+      state.tankPercent = -1;              // pump.cpp: -1 = no water -> pump blocked
+      samples[0] = samples[1] = samples[2] = -1;
+      Serial.println("TANK: sensor failed (no echo), level unknown, pump blocked");
+    }
     return;
+  }
+
+  failCount = 0;
+  if (state.tankSensorFail) {
+    state.tankSensorFail = false;
+    Serial.println("TANK: sensor OK again");
   }
 
   samples[sampleIndex] = d;

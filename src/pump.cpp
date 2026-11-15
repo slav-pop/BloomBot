@@ -7,16 +7,26 @@
 // ============================================================
 //  Watering state machine:
 //
+//  All numbers come from state.profile (moistMin/Target/Max, doseMl,
+//  minPauseH), see profile.cpp.
+//
 //  IDLE --(check time)--> soil check
-//      soil ok  -> stay IDLE
-//      soil dry -> PUMPING (or TANK_EMPTY if no water)
+//      index >= moistMin            -> stay IDLE
+//      dry, but pause not over yet  -> stay IDLE (needWater = true)
+//      dry                          -> PUMPING (or TANK_EMPTY if no water)
 //  PUMPING --(dose pumped)--> SOAKING
 //  SOAKING --(SOAK_MS)-----> soil check
-//      soil ok                     -> IDLE
-//      still dry, attempts left    -> PUMPING again
-//      still dry, no attempts left -> ERROR
+//      index >= moistTarget          -> cycle done, IDLE, pause starts
+//      below target, attempts left   -> PUMPING again
+//      no attempts left, >= moistMin -> cycle done (target not reached)
+//      no attempts left, < moistMin  -> ERROR (still dry)
 //  TANK_EMPTY --(tank refilled)--> IDLE, immediate soil check
 //  ERROR --(manual reset)--> IDLE, immediate soil check
+//
+//  The pump never starts automatically at index >= moistMax.
+//  Serial 'w' (manual test) ignores moistMax and the pause, not the tank.
+//  The pause applies between cycles since boot: the ESP32 has no clock,
+//  so the first cycle after power on is allowed right away.
 // ============================================================
 
 static unsigned long phaseStartedAt = 0;   // when the current phase began
@@ -25,6 +35,15 @@ static unsigned long lastCheckAt    = 0;   // last soil check
 static unsigned long checkDelay     = FIRST_CHECK_DELAY_MS;  // time until next check
 static unsigned long pumpTimeMs     = 0;   // how long to pump this time
 static bool locked = false;                // pumpLock(): never switch on again until reboot
+
+// soil check is non-blocking: request a measurement, evaluate it when ready
+static bool soilPending = false;           // waiting for a moisture result
+static bool soilAfterWatering = false;     // the pending check follows a portion
+static uint32_t soilSeq = 0;               // state.moistureSeq when requested
+
+// pause between watering cycles (profile.minPauseH)
+static bool cycleDoneSinceBoot = false;    // false: first cycle after boot needs no pause
+static unsigned long lastCycleEndAt = 0;
 
 // ---- the only place where the relay pin is written ----
 static void water_pump_on() {
@@ -56,6 +75,7 @@ const char* waterPhaseName(WaterPhase p) {
 }
 
 static void enterPhase(WaterPhase p) {
+    soilPending = false;                   // a phase change cancels a pending check
     state.waterPhase = p;
     phaseStartedAt = millis();
     Serial.print("WATER: -> ");
@@ -75,44 +95,115 @@ static bool tankHasWater() {
     return state.tankPercent > TANK_EMPTY_PERCENT;
 }
 
-// ---- switch the pump on, if there is water ----
-static void startPumping() {
+// ---- switch the pump on, if there is water (and the soil is not too wet) ----
+static void startPumping(bool manual) {
     if (!tankHasWater()) {
         enterPhase(PHASE_TANK_EMPTY);
         return;
     }
+    if (!manual && state.moistureIndex >= state.profile.moistMax) {
+        Serial.println("WATER: index >= moist_max - pump stays off");
+        if (state.waterPhase != PHASE_IDLE) enterPhase(PHASE_IDLE);
+        return;
+    }
     state.waterAttempts++;
-    pumpTimeMs = milliLiter_to_milliSeconds(WATER_DOSE_ML);
+    pumpTimeMs = milliLiter_to_milliSeconds(state.profile.doseMl);
     water_pump_on();
     enterPhase(PHASE_PUMPING);
 }
 
-// ---- measure the soil and decide what to do ----
-static void checkSoil(bool afterWatering) {
-    moistureMeasure();
+static unsigned long pauseMs() {
+    return (unsigned long)state.profile.minPauseH * PAUSE_UNIT_MS;
+}
+
+static bool pauseRunning() {
+    return cycleDoneSinceBoot && millis() - lastCycleEndAt < pauseMs();
+}
+
+// ---- a watering cycle is over: back to IDLE, the pause starts ----
+static void finishCycle() {
+    state.needWater = false;
+    state.waterAttempts = 0;
+    cycleDoneSinceBoot = true;
+    lastCycleEndAt = millis();
+    if (state.waterPhase != PHASE_IDLE) enterPhase(PHASE_IDLE);
+}
+
+// ---- start a soil measurement; checkSoil() runs when the result is there ----
+static void requestSoilCheck(bool afterWatering) {
+    soilSeq = state.moistureSeq;
+    soilAfterWatering = afterWatering;
+    soilPending = true;
     lastCheckAt = millis();
     checkDelay = MOISTURE_CHECK_INTERVAL_MS;
+    moistureRequest();
+}
 
+// true once, when the requested measurement has finished
+static bool soilResultReady() {
+    if (!soilPending || state.moistureSeq == soilSeq) return false;
+    soilPending = false;
+    return true;
+}
+
+// ---- the soil was measured: decide what to do ----
+static void checkSoil(bool afterWatering) {
+    const Profile& p = state.profile;
     Serial.print("WATER: soil ");
-    Serial.print(state.moisturePercent);
-    Serial.print("% (raw ");
-    Serial.print(state.moistureRaw);
-    Serial.print("), threshold ");
-    Serial.print((int)THRESHOLD_DRY);
-    Serial.println("%");
+    Serial.print(state.moistureIndex);
+    Serial.print("/100 (sensors ");
+    Serial.print(state.moistureSensorIndex[0]);
+    Serial.print(" / ");
+    Serial.print(state.moistureSensorIndex[1]);
+    Serial.print("), min/target/max ");
+    Serial.print(p.moistMin);
+    Serial.print("/");
+    Serial.print(p.moistTarget);
+    Serial.print("/");
+    Serial.println(p.moistMax);
 
-    if (state.moisturePercent >= THRESHOLD_DRY) {   // soil ok
+    // Both sensors failed: do not water blind. Back to IDLE, the next
+    // regular check tries again (LED shows the error via moistureSensorFail).
+    if (state.moistureIndex < 0) {
+        Serial.println("WATER: no data from both moisture sensors - no watering");
         state.needWater = false;
         state.waterAttempts = 0;
         if (state.waterPhase != PHASE_IDLE) enterPhase(PHASE_IDLE);
         return;
     }
 
-    state.needWater = true;                         // soil dry
-    if (!afterWatering) state.waterAttempts = 0;    // a new watering cycle begins
+    if (!afterWatering) {
+        // ---- regular check: start a new cycle? ----
+        if (state.moistureIndex >= p.moistMin) {     // soil ok
+            state.needWater = false;
+            state.waterAttempts = 0;
+            if (state.waterPhase != PHASE_IDLE) enterPhase(PHASE_IDLE);
+            return;
+        }
+        state.needWater = true;                      // soil dry
+        if (pauseRunning()) {
+            // dry again so soon after a cycle: rather sensor drift than a thirsty
+            // plant -> wait until the pause is over
+            Serial.print("WATER: dry, but pause running, ");
+            Serial.print((pauseMs() - (millis() - lastCycleEndAt)) / 1000UL);
+            Serial.println(" s left");
+            return;
+        }
+        state.waterAttempts = 0;                     // a new watering cycle begins
+        startPumping(false);
+        return;
+    }
 
+    // ---- after a portion: continue the cycle? ----
+    if (state.moistureIndex >= p.moistTarget) {      // target reached
+        finishCycle();
+        return;
+    }
     if (state.waterAttempts < MAX_WATER_ATTEMPTS) {
-        startPumping();
+        startPumping(false);
+    } else if (state.moistureIndex >= p.moistMin) {
+        Serial.println("WATER: target not reached, but soil no longer dry - cycle done");
+        finishCycle();
     } else {
         goError("soil still dry after all attempts (hose? sensor? pump?)");
     }
@@ -149,9 +240,11 @@ void pumpUpdate() {
             if (state.waterRequest) {              // manual "water now"
                 state.needWater = true;
                 state.waterAttempts = 0;
-                startPumping();
-            } else if (now - lastCheckAt >= checkDelay) {
-                checkSoil(false);
+                startPumping(true);                // ignores moistMax and the pause
+            } else if (soilResultReady()) {
+                checkSoil(soilAfterWatering);
+            } else if (!soilPending && now - lastCheckAt >= checkDelay) {
+                requestSoilCheck(false);
             }
             break;
 
@@ -166,7 +259,8 @@ void pumpUpdate() {
             break;
 
         case PHASE_SOAKING:
-            if (inPhase >= SOAK_MS) checkSoil(true);
+            if (soilResultReady()) checkSoil(true);
+            else if (!soilPending && inPhase >= SOAK_MS) requestSoilCheck(true);
             break;
 
         case PHASE_TANK_EMPTY:

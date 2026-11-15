@@ -6,15 +6,18 @@
 #include "moisture.h"
 #include "pump.h"
 #include "wifi_ota.h"
+#include "profile.h"
 
 // ============================================================
 //  Commands in the Serial Monitor:
 //    s     - watering status
 //    t     - tank data
 //    m     - measure soil now
-//    w     - water now (goes through all safety checks)
+//    w     - water now (manual test: checks the tank, ignores moist_max and the pause)
 //    r     - reset watering error
 //    i     - Wi-Fi: IP address and signal
+//    p     - show the plant profile
+//    T     - apply a test profile (Monstera) and save it in flash
 //    a     - LED: automatic status (normal mode)
 //    0..6  - LED: force a status (test):
 //            0=rainbow 1=need water 2=watering 3=low water
@@ -23,12 +26,32 @@
 
 static bool manualMode = false;  // true = manual LED choice from keyboard
 
+// serial 'm': the measurement is non-blocking, print when the result is there
+static bool printMoistureWhenReady = false;
+static uint32_t printMoistureSeq = 0;
+
+static void printMoisture() {
+  Serial.print("MOISTURE: sensor1 raw=");
+  Serial.print(state.moistureRaw[0]);
+  Serial.print(" (");
+  Serial.print(state.moistureSensorIndex[0]);
+  Serial.print("), sensor2 raw=");
+  Serial.print(state.moistureRaw[1]);
+  Serial.print(" (");
+  Serial.print(state.moistureSensorIndex[1]);
+  Serial.print(") -> ");
+  Serial.print(state.moistureIndex);
+  Serial.print(state.moistureSensorFail ? "/100 BOTH FAILED" : state.moistureMismatch ? "/100 MISMATCH" : "/100");
+  Serial.print(", ledStatus=");
+  Serial.println(state.ledStatus);
+}
+
 // ---- Core: choose what is more important to show ----
 // error > watering > low/empty tank > dry soil > connecting > okay > idle
 static void updateStatus() {
   if (manualMode) return;
 
-  if (state.errorFlag) {
+  if (state.errorFlag || state.tankSensorFail || state.moistureSensorFail) {
     state.ledStatus = STATUS_ERROR;               // the error overrides everything else
   } else if (state.pumpOn) {
     state.ledStatus = STATUS_WATERING;
@@ -38,7 +61,7 @@ static void updateStatus() {
     state.ledStatus = STATUS_NEED_WATER;
   } else if (state.wifiConnecting) {
     state.ledStatus = STATUS_WIFI_CONNECTING;
-  } else if (state.moistureRaw >= 0) {
+  } else if (state.moistureIndex >= 0) {
     state.ledStatus = STATUS_OKAY;                // sensor data present, all fine
   } else {
     state.ledStatus = STATUS_IDLE;                // no data yet
@@ -73,7 +96,7 @@ static void handleSerial() {
   case 't':
     Serial.print("TANK: ");
     if (state.tankPercent < 0) {
-      Serial.println("no data");
+      Serial.println(state.tankSensorFail ? "SENSOR FAILED (no echo)" : "no data");
     } else {
       Serial.print(state.tankDistanceCm, 1);
       Serial.print(" cm to water, level ");
@@ -83,13 +106,9 @@ static void handleSerial() {
     }
     break;
   case 'm':
-    moistureMeasure();
-    Serial.print("MOISTURE: raw=");
-    Serial.print(state.moistureRaw);
-    Serial.print(", ");
-    Serial.print(state.moisturePercent);
-    Serial.print(" %, ledStatus=");
-    Serial.println(state.ledStatus);
+    printMoistureSeq = state.moistureSeq;
+    printMoistureWhenReady = true;
+    moistureRequest();
     break;
   case 'w':
     state.waterRequest = true;
@@ -102,6 +121,26 @@ static void handleSerial() {
   case 'i':
     wifiOtaPrintInfo();
     break;
+  case 'p':
+    profilePrint();
+    break;
+  case 'T': {
+    // test profile as the server would send it (Monstera, 2 l pot),
+    // with a new version so it really counts as "new"
+    Profile t;
+    profileDefaults(t);
+    t.ver = state.profile.ver + 1;
+    t.plantId = 9001;
+    strncpy(t.name, "Swiss cheese plant", sizeof(t.name) - 1);
+    t.moistMin = 30;
+    t.moistTarget = 50;
+    t.moistMax = 70;
+    t.doseMl = 150;
+    t.minPauseH = 84;
+    profileApply(t, nullptr);
+    profilePrint();
+    break;
+  }
   case 'a':
     manualMode = false;
     Serial.println("-> LED auto mode");
@@ -125,9 +164,10 @@ void setup() {
   ledsBegin();
   tankBegin();
   moistureBegin();
+  profileBegin();       // before the first soil check
   wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
-  Serial.println("The system is running. Commands: s t m w r i a 0-6");
+  Serial.println("The system is running. Commands: s t m w r i p T a 0-6");
 #if WATER_TEST_TIMING
   Serial.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");
 #endif
@@ -136,8 +176,14 @@ void setup() {
 void loop() {
   wifiOtaUpdate();      // keep first: OTA must be handled often
   tankUpdate();
+  moistureUpdate();     // before pumpUpdate: a finished result is used in the same loop
   pumpUpdate();
   updateStatus();
   ledsUpdate();
   handleSerial();
+
+  if (printMoistureWhenReady && state.moistureSeq != printMoistureSeq) {
+    printMoistureWhenReady = false;
+    printMoisture();
+  }
 }

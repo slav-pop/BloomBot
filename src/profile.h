@@ -49,3 +49,8 @@ bool profileApply(const Profile& p, const char** reason);
 
 // Prints the profile in use to Serial (serial command 'p').
 void profilePrint();
+
+// Forgets the profile: erases it from flash and goes back to the defaults.
+// Used when the device is reset in the bot ("Gerät zurücksetzen"): the server
+// then sends the command "factory_reset". Also serial command 'F'.
+void profileFactoryReset();

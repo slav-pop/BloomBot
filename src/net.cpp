@@ -210,6 +210,10 @@ static void handleCommands(JsonArray cmds) {
       } else {
         eventPush("cmd_rejected", 0, 0, "not in ERROR");
       }
+    } else if (!strcmp(name, "factory_reset")) {
+      // device was reset in the bot: forget the plant profile
+      Log.println("NET: command factory_reset");
+      profileFactoryReset();
     } else {
       Log.print("NET: unknown command ");
       Log.println(name);

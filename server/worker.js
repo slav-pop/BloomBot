@@ -217,6 +217,12 @@ export default {
         .filter((r) => now() - r.created_at <= COMMAND_TTL_S)
         .map((r) => JSON.parse(r.cmd_json));
 
+      // Device was reset on the server (no profile any more), but still runs
+      // with an old profile from its flash -> tell it to forget it. Comes with
+      // every poll until the device reports profile_ver 0, so it also works
+      // if the device was offline during the reset.
+      if (!dev.profile_json && body.profile_ver > 0) commands.push({ cmd: "factory_reset" });
+
       return json({ poll_s: POLL_S, commands, profile });
     }
 
@@ -397,14 +403,27 @@ async function onText(env, msg) {
 
   switch (cmd) {
     case "/start":
+      // QR code on the device: t.me/<bot>?start=pair_<code> -> pair right away
+      if (arg.toLowerCase().startsWith("pair_")) return linkDevice(env, uid, arg.slice(5));
       if (arg) return acceptInvite(env, msg.from, arg);
       return send(env, uid,
         "Hallo! Ich bin BloomBot. Ich melde mich, wenn etwas zu tun ist.\n\n" +
-        "Neues Gerät: /link und der Code vom Aufkleber.\n" +
+        "Neues Gerät: QR-Code auf dem Gerät scannen oder /link und der Code vom Aufkleber.\n" +
         "„Pflanze“ – Pflanze wählen, „Topf“ – Topfgröße, „Teilen“ – jemandem Zugriff geben, " +
-        "„Status“ – aktueller Zustand.", KEYBOARD);
+        "„Status“ – aktueller Zustand.\n" +
+        "/konto_loeschen – dein Konto und alle deine Daten löschen.", KEYBOARD);
     case "/link":
       return linkDevice(env, uid, arg);
+    case "/konto_loeschen":
+      return send(env, uid,
+        "Dein Konto wirklich löschen? Deine Pflanzen und Zugriffe werden gelöscht, " +
+        "Geräte, die dir gehören, werden zurückgesetzt.",
+        { inline_keyboard: [[{ text: "Ja, Konto löschen", callback_data: "delacc" },
+                             { text: "Abbrechen", callback_data: "cancel" }]] });
+    case "/admin_reset":
+      // only for ADMIN_IDS; for everybody else the command does not exist
+      if (!isAdmin(env, uid)) return send(env, uid, "Unbekannter Befehl. Nutze die Tasten unten.", KEYBOARD);
+      return adminReset(env, uid, arg);
     case "status":
     case "/status": {
       const st = await statusText(env, uid);
@@ -492,6 +511,31 @@ async function onCallback(env, q) {
     return send(env, uid, await assignPlant(env, dev, dev.plant_id), KEYBOARD);
   }
 
+  if (kind === "cancel") return send(env, uid, "Abgebrochen.", KEYBOARD);
+
+  // "Gerät zurücksetzen": step 1 asks, step 2 ("devreset2") does it. Owner only
+  if (kind === "devreset" || kind === "devreset2") {
+    const deviceId = a;
+    const own = await q1(env,
+      "SELECT d.name FROM devices d JOIN device_access a ON a.device_id = d.id " +
+      "WHERE d.id = ?1 AND a.user_id = ?2 AND a.role = 'owner'", deviceId, uid);
+    if (!own) return send(env, uid, "Das kann nur der Besitzer des Geräts.");
+    if (kind === "devreset") {
+      return send(env, uid,
+        `BloomBot „${own.name}“ wirklich zurücksetzen? Alle verlieren den Zugriff, ` +
+        "die Pflanze wird abgemeldet, das Gerät ist danach wie neu und kann wieder gekoppelt werden.",
+        { inline_keyboard: [[{ text: "Ja, zurücksetzen", callback_data: `devreset2:${deviceId}` },
+                             { text: "Abbrechen", callback_data: "cancel" }]] });
+    }
+    await resetDevice(env, deviceId, uid);
+    return send(env, uid, `BloomBot „${own.name}“ ist zurückgesetzt.`, KEYBOARD);
+  }
+
+  if (kind === "delacc") {
+    await deleteAccount(env, uid);
+    return send(env, uid, "Dein Konto ist gelöscht. Mit /start kannst du jederzeit neu beginnen.");
+  }
+
   // "Fehler zurücksetzen": owner AND member may press it - the person who
   // looks after the plant (e.g. during a holiday) must be able to reset it
   if (kind === "reset") {
@@ -535,6 +579,64 @@ async function linkDevice(env, uid, code) {
      ON CONFLICT(device_id, user_id) DO UPDATE SET role = 'owner'`,
     dev.id, uid, now());
   return send(env, uid, `Gekoppelt: BloomBot „${dev.name}“. Wähle jetzt die Pflanze mit „Pflanze“.`, KEYBOARD);
+}
+
+// ---- device "as after purchase": nobody has access, no plant, no profile ----
+// The device row and its pair code stay (the sticker keeps working).
+// Plants stay with their owners ("my plants" belong to the user).
+// The device forgets its profile via the "factory_reset" command (see poll).
+async function resetDevice(env, deviceId, exceptUid = null) {   // exceptUid: who pressed it, gets no extra message
+  const users = await qa(env, "SELECT user_id FROM device_access WHERE device_id = ?1", deviceId);
+  const dev = await q1(env, "SELECT name FROM devices WHERE id = ?1", deviceId);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM device_access WHERE device_id = ?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM invites WHERE device_id = ?1").bind(deviceId),
+    env.DB.prepare("DELETE FROM commands WHERE device_id = ?1").bind(deviceId),
+    env.DB.prepare(
+      `UPDATE devices SET plant_id = NULL, profile_json = NULL, mode = 'normal',
+         vacation_until = NULL, forecast_since = NULL WHERE id = ?1`
+    ).bind(deviceId),
+  ]);
+  for (const u of users) {
+    if (u.user_id === exceptUid) continue;
+    await send(env, u.user_id, `BloomBot „${dev ? dev.name : deviceId}“ wurde zurückgesetzt. Du hast keinen Zugriff mehr.`);
+  }
+}
+
+// ---- delete a user and everything that belongs to them ----
+// Order matters: the database refuses to delete rows that others still point to.
+async function deleteAccount(env, uid) {
+  const owned = await qa(env,
+    "SELECT device_id FROM device_access WHERE user_id = ?1 AND role = 'owner'", uid);
+  for (const o of owned) await resetDevice(env, o.device_id, uid);   // also removes the plants from the devices
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM device_access WHERE user_id = ?1").bind(uid),
+    env.DB.prepare("DELETE FROM invites WHERE created_by = ?1 OR used_by = ?1").bind(uid),
+    env.DB.prepare("DELETE FROM my_plants WHERE owner_id = ?1").bind(uid),
+    env.DB.prepare("DELETE FROM users WHERE telegram_id = ?1").bind(uid),
+  ]);
+}
+
+// ---- admin ----
+// ADMIN_IDS = Telegram IDs (comma-separated), stored as a Worker secret.
+function isAdmin(env, uid) {
+  return (env.ADMIN_IDS || "").split(",").map((x) => x.trim()).includes(String(uid));
+}
+
+// /admin_reset [device id] - resets a device no matter who owns it.
+// Without an id: the only device, if there is exactly one.
+async function adminReset(env, uid, deviceId) {
+  if (!deviceId) {
+    const all = await qa(env, "SELECT id FROM devices");
+    if (all.length !== 1) {
+      return send(env, uid, `Bitte Geräte-ID angeben: /admin_reset <id>. Geräte: ${all.map((d) => d.id).join(", ")}`);
+    }
+    deviceId = all[0].id;
+  }
+  const dev = await q1(env, "SELECT id, name, pair_code FROM devices WHERE id = ?1", deviceId);
+  if (!dev) return send(env, uid, `Gerät „${deviceId}“ gibt es nicht.`);
+  await resetDevice(env, dev.id);
+  return send(env, uid, `Admin: BloomBot „${dev.name}“ (${dev.id}) ist zurückgesetzt. Koppel-Code: ${dev.pair_code}`);
 }
 
 async function choosePlant(env, uid) {
@@ -659,6 +761,9 @@ async function statusText(env, uid) {
       if (s.phase === "ERROR" && RESETTABLE.includes(s.error_reason)) {
         buttons.push([{ text: `Fehler zurücksetzen („${d.name}“)`, callback_data: `reset:${d.id}` }]);
       }
+    }
+    if (d.role === "owner") {
+      buttons.push([{ text: `Gerät zurücksetzen („${d.name}“)`, callback_data: `devreset:${d.id}` }]);
     }
     blocks.push(lines.join("\n"));
   }

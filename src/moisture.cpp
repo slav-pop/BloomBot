@@ -2,6 +2,7 @@
 #include "config.h"
 #include "moisture.h"
 #include "state.h"
+#include "events.h"
 #include <algorithm>  // std::sort
 
 // ============================================================
@@ -85,7 +86,10 @@ void moistureUpdate() {
         state.moistureIndex = (a >= 0) ? a : b;   // the working one, or -1
         state.moistureMismatch = false;
     }
-    state.moistureSensorFail = (state.moistureIndex < 0);
+    bool failed = (state.moistureIndex < 0);
+    if (failed && !state.moistureSensorFail) eventPush("error", 0, 0, "sensor_moisture");
+    if (!failed && state.moistureSensorFail) eventPush("error_cleared", 0, 0, "sensor_moisture");
+    state.moistureSensorFail = failed;
     state.moistureSeq++;                    // signal: a new result is ready
 }
 

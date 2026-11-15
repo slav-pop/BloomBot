@@ -2,6 +2,8 @@
 #include "config.h"
 #include "state.h"
 #include "logger.h"
+#include "events.h"
+#include "net.h"
 #include "leds.h"
 #include "water_tank.h"
 #include "moisture.h"
@@ -16,8 +18,10 @@
 //    m     - measure soil now
 //    w     - water now (manual test: checks the tank, ignores moist_max and the pause)
 //    r     - reset watering error
-//    i     - Wi-Fi: IP address and signal
+//    i     - Wi-Fi: IP address and signal, server connection
+//    n     - send the status to the server now
 //    p     - show the plant profile
+//    e     - show the events waiting for the server
 //    T     - apply a test profile (Monstera) and save it in flash
 //    a     - LED: automatic status (normal mode)
 //    0..6  - LED: force a status (test):
@@ -89,7 +93,19 @@ static void handleCommand(char ch) {
     Log.print(", attempts=");
     Log.print(state.waterAttempts);
     Log.print(", error=");
-    Log.println(state.errorFlag ? "YES" : "NO");
+    Log.println(state.errorReason ? state.errorReason : "NO");
+    Log.print("WATER: total ");
+    Log.print(state.totalPumpedMl);
+    Log.print(" ml since boot, last run ");
+    Log.print(state.lastDoseMl);
+    Log.print(" ml");
+    if (state.wateredSinceBoot) {
+      Log.print(", ");
+      Log.print((millis() - state.lastWateredAt) / 1000UL);
+      Log.println(" s ago");
+    } else {
+      Log.println(", not watered since boot");
+    }
     break;
   case 't':
     Log.print("TANK: ");
@@ -118,9 +134,17 @@ static void handleCommand(char ch) {
     break;
   case 'i':
     wifiOtaPrintInfo();
+    netPrintInfo();
+    break;
+  case 'n':
+    netPollNow();
+    Log.println("-> send status to the server now");
     break;
   case 'p':
     profilePrint();
+    break;
+  case 'e':
+    eventPrintAll();
     break;
   case 'T': {
     // test profile as the server would send it (Monstera, 2 l pot),
@@ -165,7 +189,8 @@ void setup() {
   profileBegin();       // before the first soil check
   wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
-  Log.println("The system is running. Commands: s t m w r i p T a 0-6");
+  Log.println("The system is running. Commands: s t m w r i n p T e a 0-6");
+  eventPush("boot", 0, 0, FW_VERSION);
 #if WATER_TEST_TIMING
   Log.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");
 #endif
@@ -174,6 +199,7 @@ void setup() {
 void loop() {
   wifiOtaUpdate();      // keep first: OTA must be handled often
   loggerUpdate();       // telnet: start server, accept client, send held-back text
+  netUpdate();          // server: status every poll_s, events at once (never while pumping)
   tankUpdate();
   moistureUpdate();     // before pumpUpdate: a finished result is used in the same loop
   pumpUpdate();

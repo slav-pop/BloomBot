@@ -83,6 +83,19 @@ Basis-URL: `https://<worker>.workers.dev`
   Schlägt das Senden fehl, speichert das Gerät bis zu 5 Ereignisse und sendet sie
   vor der nächsten Abfrage.
 - Bei Netzwerkfehlern: im normalen Intervall erneut versuchen. Das Gießen wird nie blockiert.
+- **Der Lichtring friert während einer Anfrage kurz ein.** Jede HTTPS-Anfrage hält `loop()`
+  für 0,5–2 s an, in dieser Zeit steht die LED-Animation still: auf der Messe (`poll_s` = 60)
+  einmal pro Minute, im Alltag alle 10 Minuten, dazu bei jedem Ereignis. Das ist bewusst so
+  entschieden: Der Code bleibt einfach, und es gibt keinen gleichzeitigen Zugriff von zwei
+  Prozessorkernen auf `state` (eine Fehlerquelle, die schwer zu finden ist). Die Pumpe ist nicht
+  betroffen, weil während des Pumpens keine Anfragen laufen.
+  Spätere Alternative: das Netzwerk als eigene FreeRTOS-Task auf dem zweiten Kern des ESP32.
+- **Zertifikatsprüfung:** Das Gerät prüft das HTTPS-Zertifikat des Servers anhand fest
+  eingebauter Root-Zertifikate. So kann niemand im selben Netz den Server vortäuschen und den
+  Geräteschlüssel abfangen. Wechselt Cloudflare die Zertifizierungsstelle oder läuft ein
+  Root-Zertifikat ab (die eingebauten gelten bis mindestens 2035), muss die Firmware
+  aktualisiert werden.
+- JSON wird mit der Bibliothek **ArduinoJson** erzeugt und gelesen.
 
 ### Regeln für den Server
 - Befehle, die älter als **30 Minuten** sind, werden verworfen statt ausgegeben.
@@ -98,10 +111,11 @@ Wird mit jeder Abfrage gesendet.
 
 ```json
 {
-  "fw": "0.3.0",
+  "fw": "0.4.0",
   "uptime_s": 12345,
   "moisture_index": 42,
-  "moisture_raw": 2900,
+  "moisture_sensors": [45, 39],
+  "moisture_raw": [2930, 3080],
   "tank_pct": 63,
   "tank_low": false,
   "tank_capacity_ml": 2000,
@@ -110,6 +124,7 @@ Wird mit jeder Abfrage gesendet.
   "pump_on": false,
   "need_water": false,
   "error": false,
+  "error_reason": null,
   "attempts": 0,
   "plant_id": 9012,
   "profile_ver": 3,
@@ -121,12 +136,16 @@ Wird mit jeder Abfrage gesendet.
 
 | Feld | Bedeutung |
 |---|---|
-| `moisture_index` | Feuchte-Index 0–100 (keine physikalischen Prozent), `-1` = keine Daten. Skala siehe Abschnitt 8 |
+| `moisture_index` | Feuchte-Index 0–100 (keine physikalischen Prozent), `-1` = keine Daten. Skala siehe Abschnitt 8. Daraus entscheidet das Gerät über das Gießen |
+| `moisture_sensors` | Index der beiden Feuchtesensoren einzeln, `-1` = Sensor ausgefallen. `moisture_index` ist ihr Mittelwert (oder der eine funktionierende) |
+| `moisture_raw` | Rohwerte des ADC 0–4095 der beiden Sensoren, `-1` = ausgefallen. Für Kalibrierung und Fehlersuche |
 | `tank_pct` | 0–100, `-1` = keine Daten oder Sensorfehler |
 | `tank_low` | true unter 20 %, wieder false über 25 % (Hysterese) |
 | `tank_capacity_ml` | Tankvolumen aus `config.h` (`TANK_CAPACITY_ML`) |
 | `total_pumped_ml` | wie viele ml seit dem Start gepumpt wurden. Beginnt nach einem Neustart bei 0 (der Server erkennt das, Abschnitt 7) |
 | `phase` | `IDLE`, `PUMPING`, `SOAKING`, `TANK_EMPTY`, `ERROR` |
+| `error` | true, wenn ein Fehler besteht (auch ein Sensorfehler) |
+| `error_reason` | `null` oder der Grund: `still_dry`, `pump_timeout`, `sensor_tank`, `sensor_moisture` (Abschnitt 4) |
 | `attempts` | wie viele Portionen im aktuellen Gießzyklus gegeben wurden |
 | `plant_id` | ID des aktiven Profils, `-1` = kein Profil (das Gerät arbeitet mit sicheren Standardwerten) |
 | `profile_ver` | Version des aktiven Profils, `0` = kein Profil |
@@ -149,7 +168,7 @@ Der Bot macht daraus Telegram-Nachrichten. Das Gerät sendet jedes Ereignis einm
 | `tank_empty` | – | „Die Pflanze braucht Wasser, aber der Tank ist leer!“ |
 | `tank_refilled` | `tank_pct` | „Tank aufgefüllt, danke. Das Wasser reicht für etwa 9–12 Tage“ |
 | `error` | `reason` | „Fehler: … Nach der Prüfung bitte „Fehler zurücksetzen“ drücken“ |
-| `error_cleared` | – | „Fehler zurückgesetzt“ |
+| `error_cleared` | `reason` (welcher Fehler weg ist) | „Fehler zurückgesetzt“ |
 | `profile_ok` | `plant_id`, `profile_ver` | „Ich kümmere mich jetzt um: Golden barrel cactus“ |
 | `profile_rejected` | `reason` | (Fehler auf dem Server, ins Log schreiben) |
 | `cmd_rejected` | `cmd`, `reason` | (ins Log schreiben) |
@@ -157,7 +176,12 @@ Der Bot macht daraus Telegram-Nachrichten. Das Gerät sendet jedes Ereignis einm
 Werte von `error.reason`:
 - `still_dry` – Boden ist nach allen Portionen noch trocken (Schlauch? Sensor? Pumpe?);
 - `pump_timeout` – Pumpe lief zu lange;
-- `sensor_tank` – keine Daten vom Tanksensor.
+- `sensor_tank` – keine Daten vom Tanksensor (geht von selbst weg, sobald der Sensor wieder antwortet);
+- `sensor_moisture` – keine Daten von beiden Feuchtesensoren, kein Gießen (geht ebenfalls von selbst weg).
+
+`still_dry` und `pump_timeout` bleiben bestehen, bis „Fehler zurücksetzen“ gedrückt wird
+(Befehl `reset`) oder am Gerät der Serial-Befehl `r` kommt. Für jeden Fehler, der wegfällt,
+sendet das Gerät `error_cleared` mit demselben `reason`.
 
 ## 5. Pflanzenprofil (Feld `profile` in der Poll-Antwort)
 

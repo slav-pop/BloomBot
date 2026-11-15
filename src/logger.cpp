@@ -94,7 +94,7 @@ void loggerUpdate() {
     client.setNoDelay(true);
     pendingLen = 0;
     skipBytes = 0;
-    Log.println("LOG: telnet client connected. Commands: s t m w r i p T a 0-6");
+    Log.println("LOG: telnet client connected. Commands: s t m w r i n p T e a 0-6");
   }
 
   if (!state.pumpOn && clientConnected()) sendPending();

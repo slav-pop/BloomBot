@@ -6,11 +6,11 @@
 | Gerät (ESP32) | Server (Cloudflare Worker) |
 |---|---|
 | Misst die Bodenfeuchte und den Wasserstand im Tank | Telegram-Bot: Benachrichtigungen und Einstellungen |
-| Gießt die Pflanze **vollständig selbstständig** nach dem aktiven Profil | Pflanzendatenbank (`data/plants.json`) |
+| Gießt die Pflanze **vollständig selbstständig** nach dem aktiven Profil | Pflanzenkatalog (im Code des Workers, Quelle `server/plants.json`) |
 | Speichert das Profil im Flash-Speicher (NVS) und arbeitet ohne WLAN und Server | Macht aus „Pflanze + Topfgröße + Modus“ ein **Profil** (Abschnitt 5) |
 | Fragt den Server ab, sendet Status und Ereignisse | Speichert Status und Verlauf in D1, setzt die Uhrzeit (der ESP32 hat keine Uhr) |
 | Führt Befehle aus, immer mit eigenen Sicherheitsprüfungen | Berechnet die **Prognose des Wasservorrats** und verwaltet den **Urlaubsmodus** (Abschnitt 7) |
-| | Antwortet nur Chats aus der Whitelist |
+| | Antwortet nur Nutzern mit Zugriff auf das Gerät (Tabelle `device_access`) |
 
 **Prinzip:** BloomBot ist ein autonomes Bewässerungsgerät. Der Benutzer gießt
 nicht aus der Ferne. Der Bot ist für zwei Dinge da:
@@ -31,6 +31,9 @@ Der Server steuert die Pumpe niemals direkt.
 - Telegram → Server: **Webhook**. Telegram ruft den Worker bei jeder Nachricht selbst auf.
 - Speicher: **D1** (SQL). KV ist für den Status ungeeignet: Im kostenlosen
   Tarif sind nur 1 000 KV-Schreibvorgänge pro Tag erlaubt.
+- Code im Repo unter `server/`. Cloudflare deployt ihn automatisch bei jedem Push in `main`
+  (Workers Builds). Im Browser-Editor von Cloudflare wird **nicht** mehr geändert:
+  der nächste Push würde es überschreiben.
 
 ### Warum das Gerät den Server selbst abfragt
 Der ESP32 steht hinter einem Router und hat keine öffentliche Adresse, daher
@@ -47,8 +50,8 @@ Basis-URL: `https://<worker>.workers.dev`
 | `POST /api/device/<id>/event` | ESP32 | ein Ereignis (Abschnitt 4) | `{"ok": true}` |
 | `POST /telegram` | Telegram | Telegram-Update | `200` |
 
-- `<id>` – Geräte-ID, z. B. `bloombot-01`. Vorerst gibt es nur ein Gerät, die ID
-  wird aber trotzdem im Pfad angegeben.
+- `<id>` – Geräte-ID, z. B. `bloombot-01`. Das Gerät muss in der Tabelle `devices` stehen,
+  sonst antwortet der Server `404 unknown_device`.
 - Authentifizierung des Geräts: Header `Authorization: Bearer <DEVICE_KEY>`.
   Der Schlüssel liegt auf dem ESP32 in `src/secrets.h` (Datei steht in `.gitignore`),
   auf dem Server wird er als Worker-Secret gespeichert.
@@ -75,17 +78,22 @@ Basis-URL: `https://<worker>.workers.dev`
 ### Regeln für das Gerät
 - Abfrageintervall: `poll_s` nur im Bereich 60–3600 s übernehmen.
   Ohne gültige Antwort 600 verwenden.
-- **Solange die Pumpe läuft, keine Netzwerkanfragen.** Eine HTTPS-Anfrage kann
-  den ESP32 für 0,5–2 s blockieren, die Pumpe muss aber rechtzeitig abschalten.
+- **Solange die Pumpe läuft, keine Netzwerkanfragen.** Eine HTTPS-Anfrage blockiert
+  den ESP32 (siehe unten), die Pumpe muss aber rechtzeitig abschalten.
   Die Abfrage wird verschoben, bis die Pumpe aus ist.
 - Ereignisse werden **sofort** gesendet, ohne auf die nächste Abfrage zu warten.
   Dadurch kommen Benachrichtigungen ohne Verzögerung an, obwohl selten abgefragt wird.
   Schlägt das Senden fehl, speichert das Gerät bis zu 5 Ereignisse und sendet sie
   vor der nächsten Abfrage.
 - Bei Netzwerkfehlern: im normalen Intervall erneut versuchen. Das Gießen wird nie blockiert.
+- **Keep-alive:** Eine neue HTTPS-Verbindung dauert auf dem ESP32 ~4 s (der TLS-Handshake prüft
+  die Zertifikatskette mit ECDSA P-384, das rechnet der ESP32 in Software). Deshalb bleibt die
+  Verbindung nach einer Anfrage offen; weitere Anfragen dauern ~0,2–0,4 s. Hat der Server die
+  Verbindung inzwischen geschlossen, wird die Anfrage einmal sofort mit neuer Verbindung wiederholt.
 - **Der Lichtring friert während einer Anfrage kurz ein.** Jede HTTPS-Anfrage hält `loop()`
-  für 0,5–2 s an, in dieser Zeit steht die LED-Animation still: auf der Messe (`poll_s` = 60)
-  einmal pro Minute, im Alltag alle 10 Minuten, dazu bei jedem Ereignis. Das ist bewusst so
+  an (meist ~0,2 s, nach Neustart oder WLAN-Verlust einmal ~4 s), in dieser Zeit steht die
+  LED-Animation still: auf der Messe (`poll_s` = 60) einmal pro Minute, im Alltag alle
+  10 Minuten, dazu bei jedem Ereignis. Das ist bewusst so
   entschieden: Der Code bleibt einfach, und es gibt keinen gleichzeitigen Zugriff von zwei
   Prozessorkernen auf `state` (eine Fehlerquelle, die schwer zu finden ist). Die Pumpe ist nicht
   betroffen, weil während des Pumpens keine Anfragen laufen.
@@ -99,9 +107,13 @@ Basis-URL: `https://<worker>.workers.dev`
 
 ### Regeln für den Server
 - Befehle, die älter als **30 Minuten** sind, werden verworfen statt ausgegeben.
-- Das Gerät gilt als **offline**, wenn länger als 3 × `poll_s` (also 30 min)
-  keine Abfrage kam. Geprüft wird bei der nächsten Anfrage von Telegram oder per
-  Cron Trigger. Der Bot schreibt: „BloomBot ist nicht erreichbar“.
+- Das Gerät gilt als **offline**, wenn länger als 3 × `poll_s` keine Abfrage kam.
+  „Status“ zeigt dann „Nicht erreichbar (letzter Kontakt vor …)“. Eine aktive
+  Meldung per Cron Trigger ist für später geplant.
+- **Schutz:** Request-Body höchstens 16 KB (Gerät) bzw. 64 KB (Telegram); vom Gerät werden nur
+  bekannte Felder mit gültigem Typ und Bereich gespeichert, unbekannte Ereignistypen werden
+  abgelehnt (`400`); Schlüssel und Webhook-Secret werden in konstanter Zeit verglichen;
+  Anfragen an Telegram haben ein Timeout von 8 s, der Bot-Token landet nie im Log.
 - Zustellung „höchstens einmal“: Geht die Poll-Antwort verloren, geht auch der
   Befehl verloren. Das Ergebnis kommt immer als Ereignis.
 
@@ -240,10 +252,14 @@ wenn das Gerät während des Zurücksetzens offline war.
 
 Gießen für Test und Vorführung: Serial-Befehl `w`, nicht über den Bot.
 
-Nach `reset` antwortet der Bot sofort: „Angenommen, BloomBot führt es innerhalb von ~10 min aus“.
+Nach `reset` antwortet der Bot sofort: „Angenommen, BloomBot führt es beim nächsten Kontakt aus“
+(auf der Messe bis ~1 min, sonst bis ~10 min).
 Das eigentliche Ergebnis kommt als Ereignis `error_cleared`.
 
 ## 7. Prognose des Wasservorrats und Urlaubsmodus (nur Server)
+
+> **Stand:** geplant, noch nicht umgesetzt. Das Gerät liefert bereits alle nötigen Daten
+> (`total_pumped_ml`, `tank_pct`, `tank_capacity_ml`), es fehlt nur der Teil auf dem Server.
 
 ### Prognose
 
@@ -287,16 +303,22 @@ Modus `eco`:
 - Der Benutzer legt Gießmenge oder -häufigkeit **nicht** manuell fest: Die Werte bleiben
   innerhalb der Grenzen, die laut DB für die Pflanze zulässig sind.
 
-### Befehle in Telegram (als Buttons)
+### Befehle in Telegram
 
-| Button / Befehl | Aktion |
-|---|---|
-| Status | letzter Status + Alter („aktualisiert vor 4 min“) + `days_left` |
-| Pflanze | Suche in der DB, Auswahl, Speichern des Profils |
-| Topf | Topfvolumen in Litern |
-| Urlaub | Rückkehrdatum → Prüfung → bei Bedarf `eco` |
-| Urlaub aus | wieder `normal` |
-| Fehler zurücksetzen | Befehl `reset` (nur in der Phase `ERROR` sichtbar) |
+| Button / Befehl | Wer | Aktion |
+|---|---|---|
+| Status | alle | letzter Status + Alter („vor 4 min“), Fehler; geplant: `days_left` |
+| Pflanze | Besitzer | „Meine Pflanzen“ oder Suche im Katalog, Topf wählen, Profil speichern |
+| Topf | Besitzer | Topfvolumen in Litern |
+| Teilen | Besitzer | Einladungslink (24 h, einmal nutzbar), Mitglieder entfernen |
+| Fehler zurücksetzen | Besitzer und Mitglieder | Befehl `reset`; in der Fehlermeldung und in „Status“, nur bei `still_dry` / `pump_timeout` |
+| Umbenennen, `/name <Name>` | Besitzer | Gerätename (max. 24 Zeichen) |
+| Gerät zurücksetzen | Besitzer | alle verlieren den Zugriff, Pflanze und Profil weg, Name wieder „BloomBot“; das Gerät bekommt `factory_reset` |
+| QR-Code / `/link <Code>` | alle | Gerät koppeln (`/start pair_<Code>` aus dem QR-Code), wer koppelt, wird Besitzer |
+| `/konto_loeschen` | alle | eigenes Konto und alle Daten löschen; eigene Geräte werden zurückgesetzt |
+| `/admin_reset [id]` | nur `ADMIN_IDS` | Gerät zurücksetzen, egal wem es gehört (für Vorführungen) |
+| Urlaub | Besitzer | **geplant:** Rückkehrdatum → Prüfung → bei Bedarf `eco` |
+| Urlaub aus | Besitzer | **geplant:** wieder `normal` |
 
 ## 8. Gießlogik auf dem Gerät (zum Verständnis)
 
@@ -319,9 +341,11 @@ zeigen, ob die DB-Werte korrigiert werden müssen.
 
 ## 9. Offene Fragen
 
-- **TBD** Worker-URL, Geräteschlüssel → `src/secrets.h` (in `.gitignore`)
 - **TBD** Koeffizient für `min_pause_h`
 - **TBD** Koeffizienten des `eco`-Modus (Feuchteniveau 0,3, Einsparung 0,7) – in der Praxis prüfen
 - **TBD** tatsächliches Tankvolumen → `TANK_CAPACITY_ML` in `config.h`
-- **TBD** Schema der Geräte-ID (fester Name oder nach MAC)
-- Firmware-Update über WLAN (OTA) – später (`firmware.bin` vom Worker oder aus GitHub Releases)
+- **TBD** Schema der Geräte-ID (fester Name oder nach MAC) und ein eigener Schlüssel pro Gerät
+  (`devices.key_hash`; zurzeit haben alle Geräte den gemeinsamen Schlüssel `DEVICE_KEY`)
+- **Geplant:** Prognose des Wasservorrats, Modus `eco`, Urlaubsmodus (Abschnitt 7)
+- **Geplant:** Auswahl des Geräts im Bot, wenn ein Nutzer mehrere Geräte besitzt
+- Tanksensor HC-SR04 ist nicht wasserdicht: vor Spritzwasser und Kondenswasser schützen

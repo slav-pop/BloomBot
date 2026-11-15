@@ -8,3 +8,5 @@ DB/
 src/secrets.h
 STATUS.md
 DECISIONS.md
+Claude outputs/
+Integration_ru.md

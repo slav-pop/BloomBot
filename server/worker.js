@@ -1,7 +1,7 @@
 // BloomBot server - data model v2 (users, devices, sharing, my plants)
 // See doc "BloomBot – Datenmodell".
 // Bindings: D1 database "DB"
-// Secrets:  DEVICE_KEY, TELEGRAM_TOKEN, TELEGRAM_SECRET
+// Secrets:  DEVICE_KEY, TELEGRAM_TOKEN, TELEGRAM_SECRET, ADMIN_IDS
 
 const POLL_S = 60;        // demo: 60 s, normal use: 600
 const DEFAULT_DEVICE_NAME = "BloomBot";   // name after "Gerät zurücksetzen"
@@ -16,9 +16,21 @@ const TELEGRAM_TIMEOUT_MS = 8000;      // give up waiting for the Telegram API
 // Pump: ~23 ml/s, PUMP_MAX_ON_MS = 10 s -> one portion must stay well below 230 ml
 const DOSE_MAX_ML = 150;
 const DEFAULT_POT_L = 1;
-const POT_SIZES = [0.5, 1, 2, 3, 5, 10];
+const POT_SIZES = [0.5, 1, 2, 3, 5];   // no 10 l: the ~1.7 l tank is too small for such pots
 const PAUSE_FACTOR = 0.5; // min_pause_h = minimum_days * 24 * PAUSE_FACTOR (TBD)
 const INVITE_TTL_S = 24 * 3600;
+
+// Water forecast, eco mode, vacation (Integration.md section 7)
+const TZ = "Europe/Berlin";        // "today" and the return date are German dates
+const TANK_RESERVE_PCT = 5;        // the pump cannot suck the last ~5 % of the tank
+const ECO_TARGET_FACTOR = 0.3;     // eco: target = min + 30 % of the way from min to target (TBD)
+const ECO_DOSE_FACTOR = 0.7;       // eco: portions 30 % smaller (TBD)
+const ECO_SAVING = 0.7;            // eco uses ~70 % of the normal water (first guess, TBD)
+const LOW_WATER_DAYS = 3;          // warn once when the water lasts less than this
+const FORECAST_RANGE = 0.2;        // show the forecast as a range: -20 % ... +20 %
+const FORECAST_MAX_DAYS = 60;      // more than this: "mehr als 60 Tage"
+const VACATION_MAX_DAYS = 90;
+const VACATION_CHOICES = [[3, "3 Tage"], [7, "1 Woche"], [14, "2 Wochen"], [21, "3 Wochen"]];
 
 // Plant catalog (generated from data/plants.json, do not edit by hand)
 const PLANTS = [
@@ -65,7 +77,7 @@ const PLANTS = [
 ];
 
 const KEYBOARD = {
-  keyboard: [[{ text: "Status" }], [{ text: "Pflanze" }, { text: "Topf" }], [{ text: "Teilen" }]],
+  keyboard: [[{ text: "Status" }], [{ text: "Pflanze" }, { text: "Topf" }], [{ text: "Teilen" }, { text: "Urlaub" }]],
   resize_keyboard: true,
   is_persistent: true,
 };
@@ -201,10 +213,52 @@ export default {
 
     if (action === "poll") {
       const body = pickFields(raw, STATUS_FIELDS);   // only valid fields are stored
+
+      // ---- water used since the last poll ----
+      // The device counts all pumped ml since its start (total_pumped_ml).
+      // The difference to the last poll is what was pumped in between.
+      // A smaller number means the device restarted and counts from 0 again,
+      // then the whole new number is new consumption.
+      const prev = await q1(env, "SELECT last_total_pumped_ml FROM status WHERE device_id = ?1", dev.id);
+      const total = body.total_pumped_ml ?? null;   // null = device did not send it
+      let pumped = 0;
+      if (total !== null && prev && prev.last_total_pumped_ml !== null) {
+        pumped = total >= prev.last_total_pumped_ml ? total - prev.last_total_pumped_ml : total;
+      }
       await run(env,
-        `INSERT INTO status (device_id, data, updated_at) VALUES (?1, ?2, ?3)
-         ON CONFLICT(device_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
-        dev.id, JSON.stringify(body), now());
+        `INSERT INTO status (device_id, data, updated_at, last_total_pumped_ml) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(device_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at,
+           last_total_pumped_ml = COALESCE(excluded.last_total_pumped_ml, status.last_total_pumped_ml)`,
+        dev.id, JSON.stringify(body), now(), total);
+      if (pumped > 0) {
+        // one row per device and day; the ml of the day add up
+        await run(env,
+          `INSERT INTO consumption (device_id, day, ml) VALUES (?1, ?2, ?3)
+           ON CONFLICT(device_id, day) DO UPDATE SET ml = ml + excluded.ml`,
+          dev.id, today(), pumped);
+      }
+
+      // ---- vacation over? ----
+      // Checked here because the device polls every few minutes anyway,
+      // so no timer (Cron Trigger) is needed. dev is reloaded: the profile may change.
+      if (dev.vacation_until && today() >= dev.vacation_until) {
+        const wasEco = dev.mode === "eco";
+        await endVacation(env, dev);
+        Object.assign(dev, await q1(env, "SELECT * FROM devices WHERE id = ?1", dev.id));
+        ctx.waitUntil(notifyDevice(env, dev.id, wasEco
+          ? `Willkommen zurück! Der Urlaubsmodus ist vorbei, ${devLabel(dev.name)} gießt wieder normal.`
+          : `Willkommen zurück! Der Urlaubsmodus ist vorbei.`));
+      }
+
+      // ---- low-water warning, once per tank filling ----
+      if (!dev.water_warned) {
+        const fc = await forecast(env, dev, body);
+        if (fc && fc.daysLeft < LOW_WATER_DAYS) {
+          await run(env, "UPDATE devices SET water_warned = 1 WHERE id = ?1", dev.id);
+          ctx.waitUntil(notifyDevice(env, dev.id,
+            `${devLabel(dev.name)}: Das Wasser reicht nur noch für ${daysRange(fc.daysLeft)}. Bitte bald nachfüllen.`));
+        }
+      }
 
       // Send the profile until the device reports the current version
       const profile = dev.profile_json && body.profile_ver !== dev.profile_ver
@@ -239,7 +293,17 @@ export default {
     const plant = dev.plant_id != null
       ? await q1(env, "SELECT * FROM my_plants WHERE id = ?1", dev.plant_id)
       : null;
-    const text = eventText(body, plant ? plantName(plant) : null);
+    let text = eventText(body, plant ? plantName(plant) : null);
+
+    // tank refilled -> a new low-water warning may come again later
+    if (body.type === "tank_refilled") await run(env, "UPDATE devices SET water_warned = 0 WHERE id = ?1", dev.id);
+    // tank messages get the forecast: "Das Wasser reicht für etwa 9–12 Tage."
+    if (text && (body.type === "tank_refilled" || body.type === "tank_low")) {
+      const st = await q1(env, "SELECT data FROM status WHERE device_id = ?1", dev.id);
+      const s = st ? JSON.parse(st.data) : {};
+      const fc = await forecast(env, dev, { ...s, tank_pct: body.tank_pct });   // the event has the newer level
+      if (fc) text += ` Das Wasser reicht für ${daysRange(fc.daysLeft)}.`;
+    }
     // an error that needs a reset gets the button right in the message
     const markup = body.type === "error" && RESETTABLE.includes(body.reason) ? resetButton(dev.id) : undefined;
     if (text) ctx.waitUntil(notifyDevice(env, dev.id, text, markup)); // answer the device right away
@@ -288,23 +352,41 @@ function searchSpecies(query) {
   return hits.slice(0, 10).map((h) => h.s);
 }
 
-// species + pot -> numbers for the device
-function buildProfile(s, potL, ver, mode, name) {
-  // total water for one watering cycle, from the plant database
-  let need = Math.round(s.ml_per_l * potL);
-  need = Math.min(Math.max(need, s.ml_min), s.ml_max);
-  // split it into equal portions, each at most DOSE_MAX_ML (pump limit)
+// total water for one watering cycle, from the plant database
+function needMl(s, potL) {
+  const need = Math.round(s.ml_per_l * potL);
+  return Math.min(Math.max(need, s.ml_min), s.ml_max);
+}
+
+// one portion: the need split into equal portions, each at most DOSE_MAX_ML (pump limit)
+function doseMl(s, potL) {
+  const need = needMl(s, potL);
   const portions = Math.ceil(need / DOSE_MAX_ML);
-  const dose = Math.round(need / portions);
+  return Math.max(Math.round(need / portions), 10);
+}
+
+// species + pot + mode -> numbers for the device
+// Eco ("Sparmodus") changes two numbers, the device needs no own logic:
+//  - target lower: the soil is kept near the lower safe limit of the plant
+//    (moister soil evaporates more and more water runs out of the pot);
+//  - portions smaller: otherwise one big portion would jump over the lower
+//    target anyway and nothing would be saved.
+function buildProfile(s, potL, ver, mode, name) {
+  let dose = doseMl(s, potL);
+  let target = s.target;
+  if (mode === "eco") {
+    target = Math.max(s.min + Math.round((s.target - s.min) * ECO_TARGET_FACTOR), s.min + 3);
+    dose = Math.max(Math.round(dose * ECO_DOSE_FACTOR), 10);
+  }
   return {
     profile_ver: ver,
     plant_id: s.id,
     name: name.slice(0, 31),
     mode,
     moist_min: s.min,
-    moist_target: s.target,
+    moist_target: target,
     moist_max: s.max,
-    dose_ml: Math.max(dose, 10),
+    dose_ml: dose,
     min_pause_h: Math.round(s.days_min * 24 * PAUSE_FACTOR),
   };
 }
@@ -332,6 +414,7 @@ async function assignPlant(env, dev, plantId) {
     `Topf: ${plant.pot_liters ?? DEFAULT_POT_L} l`,
     `Gießen bei Bodenfeuchte unter ${profile.moist_min}, bis ${profile.moist_target}, nie über ${profile.moist_max} (von 100)`,
     `Portion: ${profile.dose_ml} ml (bis zu 3 pro Gießen), frühestens alle ${profile.min_pause_h} h`,
+    ...(profile.mode === "eco" ? ["Sparmodus: an"] : []),
     "",
     `Wird beim nächsten Kontakt an das Gerät übertragen (bis ~${Math.ceil(POLL_S / 60)} min).`,
   ].join("\n");
@@ -417,6 +500,7 @@ async function onText(env, msg) {
         "Neues Gerät: QR-Code auf dem Gerät scannen oder /link und der Code vom Aufkleber.\n" +
         "„Pflanze“ – Pflanze wählen, „Topf“ – Topfgröße, „Teilen“ – jemandem Zugriff geben, " +
         "„Status“ – aktueller Zustand.\n" +
+        "„Urlaub“ – Rückkehrdatum angeben, BloomBot prüft, ob das Wasser reicht.\n" +
         "/name – dein Gerät umbenennen, z. B. /name Küche\n" +
         "/konto_loeschen – dein Konto und alle deine Daten löschen.", KEYBOARD);
     case "/link":
@@ -447,6 +531,9 @@ async function onText(env, msg) {
     case "teilen":
     case "/teilen":
       return share(env, uid);
+    case "urlaub":
+    case "/urlaub":
+      return vacationMenu(env, uid, arg);
     default:
       if (text.startsWith("/")) return send(env, uid, "Unbekannter Befehl. Nutze die Tasten unten.", KEYBOARD);
       return searchReply(env, uid, text);   // any other text = plant search
@@ -521,6 +608,32 @@ async function onCallback(env, q) {
   }
 
   if (kind === "cancel") return send(env, uid, "Abgebrochen.", KEYBOARD);
+
+  // ---- vacation and eco: owner only ----
+  if (kind === "vac" || kind === "vacset" || kind === "vacend" || kind === "eco") {
+    const dev = await requireOwner(env, uid);
+    if (!dev) return;
+    if (kind === "vac") return planVacation(env, uid, dev, addDays(today(), Number(a)));   // a = days away
+    if (kind === "vacset") {   // a = mode, b = return date
+      if (!["normal", "eco"].includes(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b || "")) return;
+      return setVacation(env, uid, dev, b, a);
+    }
+    if (kind === "vacend") {
+      if (!dev.vacation_until) return send(env, uid, "Der Urlaubsmodus ist schon aus.", KEYBOARD);
+      await endVacation(env, dev);
+      return send(env, uid, "Urlaubsmodus beendet. BloomBot gießt wieder normal.", KEYBOARD);
+    }
+    // kind === "eco": a = "on" / "off"
+    const mode = a === "on" ? "eco" : "normal";
+    if (dev.mode === mode) return send(env, uid, mode === "eco" ? "Der Sparmodus ist schon an." : "Der Sparmodus ist schon aus.");
+    const profile = await setMode(env, dev, mode);
+    if (mode === "normal") return send(env, uid, "Sparmodus aus, BloomBot gießt wieder normal.", KEYBOARD);
+    return send(env, uid, profile
+      ? `Sparmodus an: Die Erde wird etwas trockener gehalten (bis ${profile.moist_target} statt ` +
+        `${speciesById(profile.plant_id).target} von 100), die Portionen sind kleiner (${profile.dose_ml} ml). ` +
+        `Wird beim nächsten Kontakt übertragen (bis ~${Math.ceil(POLL_S / 60)} min).`
+      : "Sparmodus an. Er gilt, sobald eine Pflanze gewählt ist.", KEYBOARD);
+  }
 
   // the name is typed as a command, so no "waiting for text" state is needed
   if (kind === "rename") {
@@ -610,7 +723,7 @@ async function resetDevice(env, deviceId, exceptUid = null) {   // exceptUid: wh
     env.DB.prepare("DELETE FROM commands WHERE device_id = ?1").bind(deviceId),
     env.DB.prepare(
       `UPDATE devices SET plant_id = NULL, profile_json = NULL, mode = 'normal',
-         vacation_until = NULL, forecast_since = NULL, name = ?2 WHERE id = ?1`
+         vacation_until = NULL, forecast_since = NULL, water_warned = 0, name = ?2 WHERE id = ?1`
     ).bind(deviceId, DEFAULT_DEVICE_NAME),
   ]);
   for (const u of users) {
@@ -787,14 +900,19 @@ async function statusText(env, uid) {
       lines.push(
         `Bodenfeuchte: ${idx(s.moisture_index)}`,
         `Tank: ${pct(s.tank_pct)}${s.tank_low ? " (wenig Wasser)" : ""}`,
-        `Phase: ${s.phase || "?"} (vor ${ago(age)})`,
       );
+      const fc = await forecast(env, d, s);
+      if (fc) lines.push(`Wasser reicht für ${daysRange(fc.daysLeft)} (${fc.measured ? "nach bisherigem Verbrauch" : "Schätzung"})`);
+      lines.push(`Phase: ${s.phase || "?"} (vor ${ago(age)})`);
       if (s.error) lines.push(`Fehler: ${ERROR_REASONS[s.error_reason] || s.error_reason || "unbekannt"}`);
       if (s.phase === "ERROR" && RESETTABLE.includes(s.error_reason)) {
         buttons.push([{ text: `Fehler zurücksetzen („${d.name}“)`, callback_data: `reset:${d.id}` }]);
       }
     }
+    if (d.vacation_until) lines.push(`Urlaub bis ${fmtDay(d.vacation_until)}${d.mode === "eco" ? ", Sparmodus an" : ""}`);
+    else if (d.mode === "eco") lines.push("Sparmodus: an");
     if (d.role === "owner") {
+      buttons.push([{ text: d.mode === "eco" ? "Sparmodus aus" : "Sparmodus an", callback_data: `eco:${d.mode === "eco" ? "off" : "on"}` }]);
       buttons.push([
         { text: "Umbenennen", callback_data: `rename:${d.id}` },
         { text: "Gerät zurücksetzen", callback_data: `devreset:${d.id}` },
@@ -803,6 +921,165 @@ async function statusText(env, uid) {
     blocks.push(lines.join("\n"));
   }
   return { text: blocks.join("\n\n"), markup: buttons.length ? { inline_keyboard: buttons } : undefined };
+}
+
+// ================= Water forecast, eco mode, vacation =================
+
+// ---- how many days the water in the tank lasts ----
+// Returns null if there is nothing to calculate with (no plant, no tank data).
+//   remaining = water above the 5 % reserve
+//   per day   = measured: pumped ml in the last days / number of days
+//               estimate: the water need of one cycle, once per average cycle
+// The measurement is only used after at least one full watering cycle
+// (days_max of the plant): a cactus that has not been watered in its first
+// 5 days does not use "0 ml per day". Until then the estimate is used.
+// The window is at most max(7, 2 × days_max) days and starts again with a
+// new plant or another mode (forecast_since), because those change the use.
+async function forecast(env, dev, s) {
+  if (dev.plant_id == null || !s || !(s.tank_pct >= 0) || !(s.tank_capacity_ml > 0)) return null;
+  const plant = await q1(env, "SELECT * FROM my_plants WHERE id = ?1", dev.plant_id);
+  const sp = plant ? speciesById(plant.species_id) : null;
+  if (!sp) return null;
+
+  const remainingMl = Math.max(s.tank_pct - TANK_RESERVE_PCT, 0) / 100 * s.tank_capacity_ml;
+  const t = now();
+  const windowDays = Math.min(Math.max(7, 2 * sp.days_max), FORECAST_MAX_DAYS);
+  const since = Math.max(dev.forecast_since ?? t, t - windowDays * 86400);
+  const spanDays = (t - since) / 86400;
+
+  // perDay is always "how much the NORMAL mode would use"; eco = perDay × ECO_SAVING
+  let perDay = null;
+  let measured = false;
+  if (spanDays >= Math.max(2, sp.days_max)) {
+    const row = await q1(env,
+      "SELECT COALESCE(SUM(ml), 0) AS ml FROM consumption WHERE device_id = ?1 AND day >= ?2",
+      dev.id, dayOf(since));
+    if (row.ml > 0) {
+      perDay = row.ml / spanDays;
+      if (dev.mode === "eco") perDay /= ECO_SAVING;   // measured in eco -> back to normal
+      measured = true;
+    }
+  }
+  if (perDay === null) {
+    perDay = needMl(sp, plant.pot_liters ?? DEFAULT_POT_L) / ((sp.days_min + sp.days_max) / 2);
+  }
+  const days = (mode) => remainingMl / (perDay * (mode === "eco" ? ECO_SAVING : 1));
+  return { measured, daysNormal: days("normal"), daysEco: days("eco"), daysLeft: days(dev.mode) };
+}
+
+// 10.4 days -> "etwa 8–13 Tage" (±20 %: the use depends on weather, heating, growth)
+function daysRange(days) {
+  if (days >= FORECAST_MAX_DAYS) return `mehr als ${FORECAST_MAX_DAYS} Tage`;
+  if (days < 1) return "weniger als 1 Tag";
+  const lo = Math.max(1, Math.floor(days * (1 - FORECAST_RANGE)));
+  const hi = Math.ceil(days * (1 + FORECAST_RANGE));
+  return lo === hi ? `etwa ${lo} ${lo === 1 ? "Tag" : "Tage"}` : `etwa ${lo}–${hi} Tage`;
+}
+
+// "bis ~25.11." / "für mehr als 60 Tage"
+function lastsUntil(days) {
+  if (days >= FORECAST_MAX_DAYS) return `für mehr als ${FORECAST_MAX_DAYS} Tage`;
+  return `bis ~${fmtDay(addDays(today(), Math.floor(days)))}`;
+}
+
+// adds a dot at the end, unless the text already ends with one ("bis ~25.11.")
+function dot(text) {
+  return text.endsWith(".") ? text : `${text}.`;
+}
+
+// ---- eco on/off: a new profile version with other numbers ----
+// Returns the new profile, or null if no plant is on the device yet
+// (then only the mode is stored and used for the next plant).
+async function setMode(env, dev, mode) {
+  if (dev.plant_id == null) {
+    await run(env, "UPDATE devices SET mode = ?1 WHERE id = ?2", mode, dev.id);
+    return null;
+  }
+  const plant = await q1(env, "SELECT * FROM my_plants WHERE id = ?1", dev.plant_id);
+  const s = speciesById(plant.species_id);
+  const ver = dev.profile_ver + 1;
+  const profile = buildProfile(s, plant.pot_liters ?? DEFAULT_POT_L, ver, mode, s.en);
+  // forecast_since = now: the measured use of the other mode does not count any more
+  await run(env,
+    "UPDATE devices SET mode = ?1, profile_ver = ?2, profile_json = ?3, forecast_since = ?4 WHERE id = ?5",
+    mode, ver, JSON.stringify(profile), now(), dev.id);
+  return profile;
+}
+
+// ---- "Urlaub" button and /urlaub 24.12. ----
+async function vacationMenu(env, uid, arg) {
+  const dev = await requireOwner(env, uid);
+  if (!dev) return;
+  if (arg) {
+    const day = parseDay(arg);
+    if (!day) return send(env, uid, "Das Datum verstehe ich nicht. Beispiel: /urlaub 24.12.");
+    return planVacation(env, uid, dev, day);
+  }
+  if (dev.vacation_until) {
+    return send(env, uid,
+      dot(`Urlaubsmodus bis ${fmtDay(dev.vacation_until)}${dev.mode === "eco" ? ", Sparmodus an" : ""}`),
+      { inline_keyboard: [[{ text: "Urlaub beenden", callback_data: "vacend" }]] });
+  }
+  return send(env, uid, "Wann bist du zurück? Für ein anderes Datum schreib z. B. /urlaub 24.12.", {
+    inline_keyboard: [VACATION_CHOICES.map(([n, label]) => ({ text: label, callback_data: `vac:${n}` }))],
+  });
+}
+
+// ---- the user only gives the return date, BloomBot decides the rest ----
+// 1. water lasts in the current mode -> vacation on, nothing else changes
+// 2. lasts only in eco               -> suggest eco
+// 3. not even in eco                 -> say so, suggest a helper or a bigger tank
+// "lasts" = days until the return + 1 day reserve
+async function planVacation(env, uid, dev, until) {
+  if (dev.plant_id == null) return send(env, uid, "Wähle zuerst eine Pflanze mit „Pflanze“.");
+  const away = daysBetween(today(), until);
+  if (away < 1 || away > VACATION_MAX_DAYS) {
+    return send(env, uid, `Das Rückkehrdatum muss zwischen morgen und in ${VACATION_MAX_DAYS} Tagen liegen.`);
+  }
+  const need = away + 1;
+  const back = `Rückkehr am ${fmtDay(until)}`;   // ends with a dot already: "Rückkehr am 23.11."
+  const choice = (yes, no) => ({ inline_keyboard: [[
+    { text: yes, callback_data: `vacset:eco:${until}` },
+    { text: no, callback_data: `vacset:normal:${until}` },
+  ]] });
+
+  const st = await q1(env, "SELECT data FROM status WHERE device_id = ?1", dev.id);
+  const fc = st ? await forecast(env, dev, JSON.parse(st.data)) : null;
+  if (!fc) {
+    return send(env, uid,
+      `${back} Den Wasservorrat kann ich gerade nicht schätzen (keine Daten vom Tank). ` +
+      "Für die Zeit den Sparmodus einschalten?", choice("Ja, Sparmodus", "Nein, normal"));
+  }
+  const nowDays = dev.mode === "eco" ? fc.daysEco : fc.daysNormal;
+  if (nowDays >= need) return setVacation(env, uid, dev, until, dev.mode, fc);
+  if (fc.daysEco >= need) {
+    return send(env, uid,
+      `${back} Das Wasser reicht nur ${lastsUntil(fc.daysNormal)}, im Sparmodus ${dot(lastsUntil(fc.daysEco))} ` +
+      "Sparmodus einschalten?", choice("Ja, Sparmodus", "Nein, normal lassen"));
+  }
+  return send(env, uid,
+    `${back} Selbst im Sparmodus reicht das Wasser nicht (nur ${lastsUntil(fc.daysEco)}). ` +
+    "Bitte jemanden, nachzufüllen („Teilen“ gibt ihm Zugriff und die Benachrichtigungen), " +
+    "oder stell einen größeren Tank auf.", choice("Sparmodus trotzdem an", "Ohne Sparmodus"));
+}
+
+// stores the vacation; switches the mode if needed
+async function setVacation(env, uid, dev, until, mode, fc = null) {
+  await run(env, "UPDATE devices SET vacation_until = ?1 WHERE id = ?2", until, dev.id);
+  if (mode !== dev.mode) await setMode(env, dev, mode);
+  const lines = [`Urlaubsmodus an bis ${fmtDay(until)}`];
+  if (fc) lines.push(dot(`Alles in Ordnung: Das Wasser reicht ${lastsUntil(mode === "eco" ? fc.daysEco : fc.daysNormal)}`));
+  lines.push(mode === "eco"
+    ? "Sparmodus: an, er wird am Rückkehrtag automatisch ausgeschaltet."
+    : "BloomBot gießt normal weiter.");
+  lines.push("Wird es knapp, melde ich mich.");
+  return send(env, uid, lines.join("\n"), KEYBOARD);
+}
+
+// vacation over (return day reached or "Urlaub beenden"): back to normal
+async function endVacation(env, dev) {
+  await run(env, "UPDATE devices SET vacation_until = NULL WHERE id = ?1", dev.id);
+  if (dev.mode === "eco") await setMode(env, dev, "normal");
 }
 
 // ================= Telegram API =================
@@ -863,6 +1140,43 @@ async function run(env, sql, ...args) { return stmt(env, sql, args).run(); }
 
 function now() {
   return Math.floor(Date.now() / 1000);
+}
+
+// ---- dates as "YYYY-MM-DD" text, German time ----
+// Text in this form sorts like dates, so "today >= vacation_until" works.
+function dayOf(ts) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(ts * 1000)).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+function today() { return dayOf(now()); }
+function dayToUtc(day) {
+  const [y, m, d] = day.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+function addDays(day, n) {
+  return new Date(dayToUtc(day) + n * 86400000).toISOString().slice(0, 10);
+}
+function daysBetween(a, b) {
+  return Math.round((dayToUtc(b) - dayToUtc(a)) / 86400000);
+}
+function fmtDay(day) {   // "2026-11-25" -> "25.11."
+  const [, m, d] = day.split("-");
+  return `${d}.${m}.`;
+}
+// "24.12.", "24.12", "24.12.2026" -> "2026-12-24"; without a year: the next 24.12.
+function parseDay(text) {
+  const m = text.trim().match(/^(\d{1,2})\.(\d{1,2})\.?(\d{4})?$/);
+  if (!m) return null;
+  const d = Number(m[1]), mo = Number(m[2]);
+  const t = today();
+  let y = m[3] ? Number(m[3]) : Number(t.slice(0, 4));
+  const make = (yy) => new Date(Date.UTC(yy, mo - 1, d)).toISOString().slice(0, 10);
+  let day = make(y);
+  if (Number(day.slice(5, 7)) !== mo || Number(day.slice(8, 10)) !== d) return null;   // e.g. 31.02.
+  if (!m[3] && day <= t) day = make(y + 1);
+  return day;
 }
 
 function randomCode(len) {

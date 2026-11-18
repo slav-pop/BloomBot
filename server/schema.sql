@@ -28,6 +28,7 @@ CREATE TABLE devices (
   profile_ver    INTEGER NOT NULL DEFAULT 0,
   profile_json   TEXT,
   forecast_since INTEGER,
+  water_warned   INTEGER NOT NULL DEFAULT 0,   -- 1 = "water lasts < 3 days" was sent, 0 again after refilling
   created_at     INTEGER NOT NULL
 );
 

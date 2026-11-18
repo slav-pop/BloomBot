@@ -47,6 +47,10 @@ const char* profileCheck(const Profile& p);
 // server as the event "profile_rejected".
 bool profileApply(const Profile& p, const char** reason);
 
+// Fair demo (sim.h): uses the profile like profileApply, but ONLY in RAM - nothing
+// is written to flash, a reboot brings the saved profile (or the defaults) back.
+bool profileUseDemo(const Profile& p, const char** reason);
+
 // Prints the profile in use to Serial (serial command 'p').
 void profilePrint();
 

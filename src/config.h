@@ -121,6 +121,21 @@ static_assert(WATER_DOSE_ML <= DOSE_MAX_ML, "WATER_DOSE_ML is bigger than DOSE_M
   #define PAUSE_UNIT_MS  3600000UL
 #endif
 
+// ============ Fair demo plant (sim.h, demo/display_demo) ============
+// One default plant for the demo, when no plant profile came from the server.
+// Fensterblatt (Monstera deliciosa, id 9001) from server/plants.json, pot 1 l (bot default
+// DEFAULT_POT_L), numbers as the server's buildProfile() would send them:
+//   soil min/target/max 30/50/70 (soil_moisture)
+//   dose  = 120 ml per litre x 1 l = 120 ml  (one portion, <= DOSE_MAX_ML)
+//   pause = minimum_days 7 x 24 h x 0.5 (PAUSE_FACTOR) = 84 h  (84 s with WATER_TEST_TIMING)
+#define DEMO_PLANT_ID        9001
+#define DEMO_PLANT_NAME      "Fensterblatt"
+#define DEMO_MOIST_MIN       30
+#define DEMO_MOIST_TARGET    50
+#define DEMO_MOIST_MAX       70
+#define DEMO_DOSE_ML         120
+#define DEMO_MIN_PAUSE_H     84
+
 // ============ Wi-Fi / OTA =============
 // SSID and passwords live in src/secrets.h (not in git)
 #define OTA_HOSTNAME   "bloombot"   // -> bloombot.local

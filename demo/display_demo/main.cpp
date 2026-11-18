@@ -12,7 +12,6 @@
 //    d     - demo tour on/off: changes the mood every DEMO_STEP_MS
 //    + -   - soil index +10 / -10
 //    ] [   - tank level +10 / -10 %
-//    n     - next plant name (incl. no profile, umlaut and long name)
 //    x     - next error text (none, tank sensor, soil sensor, pump, still dry)
 //    f     - frame time (last / max) and free memory
 //    i     - Wi-Fi info
@@ -43,12 +42,6 @@ static bool tourOn = true;            // start with the tour, so it moves withou
 static int tourPos = 0;
 static unsigned long tourStepAt = 0;
 
-// "" = no profile -> screen shows "BloomBot". "\xC3\xBC" = UTF-8 "ü", as the server sends it
-static const char* PLANT_NAMES[] = {
-  "", "Monstera", "Gr\xC3\xBCnlilie", "Bogenhanf", "Geigenfeige (Ficus lyrata)"
-};
-static const int PLANT_COUNT = sizeof(PLANT_NAMES) / sizeof(PLANT_NAMES[0]);
-static int plantPos = 1;
 
 static int errorPos = 0;   // 0 = no error, see setError()
 
@@ -70,13 +63,18 @@ static void setStatus(LedStatus s) {
   Log.println(STATUS_NAMES[s]);
 }
 
-static void setPlant(int i) {
-  const char* name = PLANT_NAMES[i];
-  state.profile.plantId = name[0] ? 9000 + i : -1;
-  strncpy(state.profile.name, name, sizeof(state.profile.name) - 1);
+// ONE demo plant with real data: Fensterblatt (Monstera), config.h DEMO_* (same as src/sim.cpp)
+static void setDemoPlant() {
+  state.profile.plantId = DEMO_PLANT_ID;
+  strncpy(state.profile.name, DEMO_PLANT_NAME, sizeof(state.profile.name) - 1);
   state.profile.name[sizeof(state.profile.name) - 1] = '\0';
-  Log.print("-> plant: ");
-  Log.println(name[0] ? name : "(no profile)");
+  state.profile.moistMin = DEMO_MOIST_MIN;
+  state.profile.moistTarget = DEMO_MOIST_TARGET;
+  state.profile.moistMax = DEMO_MOIST_MAX;
+  state.profile.doseMl = DEMO_DOSE_ML;
+  state.profile.minPauseH = DEMO_MIN_PAUSE_H;
+  Log.printf("-> plant: %s, soil %d/%d/%d, portion %d ml\r\n", DEMO_PLANT_NAME,
+             DEMO_MOIST_MIN, DEMO_MOIST_TARGET, DEMO_MOIST_MAX, DEMO_DOSE_ML);
 }
 
 // The same flags the real modules set; display.cpp turns them into the error text
@@ -90,7 +88,7 @@ static void setError(int i) {
 }
 
 static void printHelp() {
-  Log.println("DEMO commands: 0-6 mood, d tour on/off, +/- soil, ]/[ tank, n plant, x error, f frame/memory, i wifi, h help");
+  Log.println("DEMO commands: 0-6 mood, d tour on/off, +/- soil, ]/[ tank, x error, f frame/memory, i wifi, h help");
   Log.println("Web page keys (same as the real firmware, played as moods): D w L V r o a m s t j");
 }
 
@@ -105,19 +103,19 @@ static void printState() {
              (int)state.ledStatus, state.moistureIndex, state.tankPercent,
              state.ledStatus == STATUS_NEED_WATER ? 1 : 0, err, state.wifiConnected ? 1 : 0,
              state.moistureIndex, state.tankPercent,
-             DEFAULT_MOIST_MIN, DEFAULT_MOIST_TARGET, DEFAULT_MOIST_MAX, tourOn ? 1 : 0);
+             DEMO_MOIST_MIN, DEMO_MOIST_TARGET, DEMO_MOIST_MAX, tourOn ? 1 : 0);
 }
 
 // Keys of the real firmware (src/main.cpp, src/sim.h), played as moods: no pump here
 static bool handleWebKey(char ch) {
   switch (ch) {
     case 'j': printState(); return true;
-    case 'D': tourOn = false; state.moistureIndex = DEFAULT_MOIST_MIN - 10; setStatus(STATUS_NEED_WATER); return true;
+    case 'D': tourOn = false; state.moistureIndex = DEMO_MOIST_MIN - 10; setStatus(STATUS_NEED_WATER); return true;
     case 'w': tourOn = false; setStatus(STATUS_WATERING); return true;
     case 'L': tourOn = false; setStatus(STATUS_LOW_WATER); return true;
     case 'V': tourOn = false; setStatus(STATUS_OKAY); state.tankPercent = 100; return true;
     case 'r':
-    case 'o': tourOn = false; errorPos = 0; setError(0); state.moistureIndex = 42; setStatus(STATUS_OKAY); return true;
+    case 'o': tourOn = false; errorPos = 0; setError(0); state.moistureIndex = DEMO_MOIST_TARGET; setStatus(STATUS_OKAY); return true;
     case 'a': tourOn = true; tourStepAt = millis(); Log.println("-> tour ON"); return true;
     case 'm':
     case 's':
@@ -143,7 +141,6 @@ static void handleCommand(char ch) {
     case '-': state.moistureIndex = max(state.moistureIndex - 10, -1);  Log.printf("-> soil %d\r\n", state.moistureIndex); break;
     case ']': state.tankPercent = min(state.tankPercent + 10, 100);     Log.printf("-> tank %d\r\n", state.tankPercent); break;
     case '[': state.tankPercent = max(state.tankPercent - 10, -1);      Log.printf("-> tank %d\r\n", state.tankPercent); break;
-    case 'n': plantPos = (plantPos + 1) % PLANT_COUNT; setPlant(plantPos); break;
     case 'x': errorPos = (errorPos + 1) % 5; setError(errorPos); break;
     case 'f': displayPrintStats(); break;
     case 'i': wifiOtaPrintInfo(); break;
@@ -156,9 +153,9 @@ void setup() {
   Serial.begin(115200);
 
   // Fake data for the data line (-1 would show "--")
-  state.moistureIndex = 42;
+  state.moistureIndex = DEMO_MOIST_TARGET;
   state.tankPercent = 68;
-  setPlant(plantPos);
+  setDemoPlant();
   setStatus(TOUR[0]);
 
   displayBegin();

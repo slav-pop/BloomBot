@@ -3,6 +3,7 @@
 #include "state.h"
 #include "logger.h"
 #include "pump.h"
+#include "profile.h"
 #include "sim.h"
 
 // ============================================================
@@ -12,12 +13,10 @@
 
 static const int SIM_STEP          = 10;     // + - [ ]
 static const int SIM_DRY_BELOW_MIN = 10;     // 'D': this much below the profile's moist_min
-static const uint32_t SIM_GLASS_BUDGET_ML = 300;  // the glass at the fair; more = "tank empty"
+// Glass budget = one full watering cycle of the plant: MAX_WATER_ATTEMPTS x dose
+// (demo plant Fensterblatt: 3 x 120 ml = 360 ml), see glassBudgetMl()
 static const int SIM_LOW_TANK      = 15;     // 'L': below TANK_LOW_ON_PERCENT (20)
 static const int SIM_FULL_TANK     = 100;    // 'V'
-static const int SIM_UNKNOWN_SOIL  = 50;     // start value if the real sensors have no data
-static const float SIM_SOIL_PER_ML = 0.25f;  // a portion makes the soil wetter by ml x this ...
-static const int SIM_MIN_SOIL_GAIN = 12;     // ... but at least this (dry -> target in <= 3 portions)
 
 static int   soil = -1;          // -1 = real sensors
 static float tank = -1;          // -1 = real sensor only
@@ -26,17 +25,40 @@ static bool  wasPumping = false;
 static uint32_t glassStartMl = 0;   // state.totalPumpedMl when the glass was emptied ('G')
 static bool  demoUsed = false;      // a simulated value was set since boot: the hose is in the glass
 static bool  glassFullLogged = false;
+static bool  demoPlantChecked = false;
+
+// No plant from the server: the demo uses ONE plant with real data (config.h DEMO_*)
+static void useDemoPlant() {
+  if (demoPlantChecked) return;
+  demoPlantChecked = true;
+  if (state.profile.plantId >= 0) {
+    Log.printf("SIM: plant from the server stays in use: %s\r\n", state.profile.name);
+    return;
+  }
+  Profile p = state.profile;
+  p.plantId = DEMO_PLANT_ID;
+  strncpy(p.name, DEMO_PLANT_NAME, sizeof(p.name) - 1);
+  p.name[sizeof(p.name) - 1] = '\0';
+  p.moistMin = DEMO_MOIST_MIN;
+  p.moistTarget = DEMO_MOIST_TARGET;
+  p.moistMax = DEMO_MOIST_MAX;
+  p.doseMl = DEMO_DOSE_ML;
+  p.minPauseH = DEMO_MIN_PAUSE_H;
+  profileUseDemo(p, nullptr);
+}
+
+static uint32_t glassBudgetMl() { return (uint32_t)MAX_WATER_ATTEMPTS * state.profile.doseMl; }
 
 static int clampIndex(int v) { return constrain(v, 0, 100); }
 
 static uint32_t glassMl() { return state.totalPumpedMl - glassStartMl; }
 
 // Glass budget: while the demo runs, the hose ends in a glass, not in a pot.
-// Visitors may press "water now" again and again - after SIM_GLASS_BUDGET_ML the
+// Visitors may press "water now" again and again - after glassBudgetMl() the
 // tank counts as empty (pump.cpp -> TANK_EMPTY). Only 'G' (terminal, not the web
 // page) and a reboot start a new glass; 'o' does not, so the limit can not be skipped:
 // it depends on demoUsed (stays true until reboot), not on the current simulated values.
-static bool glassFull() { return demoUsed && glassMl() >= SIM_GLASS_BUDGET_ML; }
+static bool glassFull() { return demoUsed && glassMl() >= glassBudgetMl(); }
 
 int simSoil() { return soil; }
 
@@ -74,8 +96,12 @@ static void setTank(float v) {
 
 static int soilNow() {
   if (soil >= 0) return soil;
-  return state.moistureIndex >= 0 ? state.moistureIndex : SIM_UNKNOWN_SOIL;
+  return state.moistureIndex >= 0 ? state.moistureIndex : state.profile.moistTarget;
 }
+
+// 'D' = this dry; one full portion brings the soil from here to moist_target
+// (the dose of the plant database is meant to do exactly that)
+static int drySoil() { return state.profile.moistMin - SIM_DRY_BELOW_MIN; }
 
 static float tankNow() {
   if (tank >= 0) return tank;
@@ -104,14 +130,15 @@ static void printState() {
              (unsigned long)state.totalPumpedMl, state.wifiConnected ? 1 : 0,
              soil, simTankLimit(), hoseOff ? 0 : 1,
              state.profile.moistMin, state.profile.moistTarget, state.profile.moistMax,
-             (unsigned long)(demoUsed ? glassMl() : 0), (unsigned long)SIM_GLASS_BUDGET_ML);
+             (unsigned long)(demoUsed ? glassMl() : 0), (unsigned long)glassBudgetMl());
 }
 
 bool simHandleCommand(char c) {
+  if (c != 'j' && strchr("+-D][LVHoG", c)) useDemoPlant();
   switch (c) {
     case '+': setSoil(soilNow() + SIM_STEP); return true;
     case '-': setSoil(soilNow() - SIM_STEP); return true;
-    case 'D': setSoil(state.profile.moistMin - SIM_DRY_BELOW_MIN); return true;
+    case 'D': setSoil(drySoil()); return true;
     case ']': setTank(tankNow() + SIM_STEP); return true;
     case '[': setTank(tankNow() - SIM_STEP); return true;
     case 'L': setTank(SIM_LOW_TANK); return true;
@@ -144,7 +171,10 @@ void simUpdate() {
 
   uint16_t ml = state.lastDoseMl;
   if (tank >= 0) setTank(tank - ml * 100.0f / TANK_CAPACITY_ML);
-  if (soil >= 0 && !hoseOff) {
-    setSoil(soil + max(SIM_MIN_SOIL_GAIN, (int)(ml * SIM_SOIL_PER_ML + 0.5f)));
+  if (soil >= 0 && !hoseOff && state.profile.doseMl > 0) {
+    // a full portion: dry -> target; a shorter run (tank empty) proportionally less
+    int fullGain = state.profile.moistTarget - drySoil();
+    int gain = (int)((long)fullGain * ml / state.profile.doseMl);
+    setSoil(soil + max(1, gain));
   }
 }

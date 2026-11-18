@@ -10,6 +10,7 @@
 #include "pump.h"
 #include "wifi_ota.h"
 #include "profile.h"
+#include "display.h"
 
 // ============================================================
 //  Commands - in the Serial Monitor (cable) or over Wi-Fi (telnet, see logger.h):
@@ -24,8 +25,9 @@
 //    e     - show the events waiting for the server
 //    F     - forget the plant profile (factory reset), back to defaults
 //    T     - apply a test profile (Monstera) and save it in flash
+//    f     - screen: frame time (last / max) and free memory
 //    a     - LED: automatic status (normal mode)
-//    0..6  - LED: force a status (test):
+//    0..6  - LED + screen: force a status (test):
 //            0=rainbow 1=need water 2=watering 3=low water
 //            4=connecting 5=okay 6=error
 // ============================================================
@@ -167,6 +169,9 @@ static void handleCommand(char ch) {
     profilePrint();
     break;
   }
+  case 'f':
+    displayPrintStats();
+    break;
   case 'a':
     manualMode = false;
     Log.println("-> LED auto mode");
@@ -191,9 +196,10 @@ void setup() {
   tankBegin();
   moistureBegin();
   profileBegin();       // before the first soil check
+  displayBegin();       // after profileBegin: the screen shows the plant name
   wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
-  Log.println("The system is running. Commands: s t m w r i n p T e F a 0-6");
+  Log.println("The system is running. Commands: s t m w r i n p T e F f a 0-6");
   eventPush("boot", 0, 0, FW_VERSION);
 #if WATER_TEST_TIMING
   Log.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");
@@ -209,6 +215,7 @@ void loop() {
   pumpUpdate();
   updateStatus();
   ledsUpdate();
+  displayUpdate();      // after updateStatus: the flower shows the same status as the LEDs
   // commands: from the USB cable and from the telnet client
   while (Serial.available() > 0) handleCommand(Serial.read());
   int c;

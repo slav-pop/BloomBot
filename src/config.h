@@ -15,6 +15,9 @@
 #define PUMP_PIN       26   // relay module IN  - on PICO 15 Relais IN PIN
 #define MOISTURE_POWER_PIN  27  // VCC of both moisture sensors (3.3 V from GPIO)
 #define TANK_POWER_PIN      33  // breadboard only: VCC of HC-SR04 (no access to 3V3 pin)
+#define DISPLAY_DC_PIN      16  // screen DC  (label RX2)
+#define DISPLAY_RST_PIN     17  // screen RES (label TX2)
+// screen SCL -> 18, SDA -> 23: default hardware SPI pins, not set in code
 
 // ============ LED-strip ==============
 #define TOTAL_LEDS     60   // whole 1m of strip
@@ -22,6 +25,13 @@
 // #define BRIGHTNESS     200  // ATTENTION: on a real use set to ~30
 #define BRIGHTNESS     30   // real use 
 #define MAX_MILLIAMPS  500  // hard power limit
+
+// ============ Display ================
+// 1.3" IPS 240x240, ST7789 (module GMT130-V1.0)
+#define DISPLAY_ENABLED   1            // 0 = no screen connected
+#define DISPLAY_SPI_HZ    40000000UL   // lower to 20000000 if the picture has glitches
+#define DISPLAY_ROTATION  0            // 0..3: turn the picture in 90° steps (fit to the case)
+#define DISPLAY_FRAME_MS  100UL        // ~10 frames/s; one frame blocks loop() ~30 ms
 
 // ============ Water tank ==============
 // These two numbers need to be

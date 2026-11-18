@@ -7,6 +7,16 @@
 * 2x HD38 soil moisture sensor
 * JQC-3FF-S-Z relay
 * 5V pump
+* 1.3" IPS display 240x240, ST7789 (GMT130-V1.0): DC → GPIO 16, RES → GPIO 17, SCL → 18, SDA → 23
+
+## Display
+An animated flower shows the same status as the LED strip (sleeping, watering, dry soil, low tank, error),
+the plant name on top and soil / tank values below. Code: `src/display.cpp`, settings: `src/config.h`.
+Command `f` (Serial or telnet) prints the frame time and free memory.
+
+To try the animation without pump, sensors and server, upload `env:display_demo_ota` (Wi-Fi)
+or `env:display_demo` (cable) — see `demo/display_demo/README.md` and the rules in
+`demo/display_demo/ANIMATION_LIMITS.md`. Upload `env:ota` / `env:esp32dev` to get the real firmware back.
 
 ## Telegram-Bot buttons and dialogs
 - Status: displays the latest status, data age, and how many days the water supply will last

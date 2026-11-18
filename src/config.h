@@ -30,7 +30,8 @@
 // 1.3" IPS 240x240, ST7789 (module GMT130-V1.0)
 #define DISPLAY_ENABLED   1            // 0 = no screen connected
 #define DISPLAY_SPI_HZ    40000000UL   // lower to 20000000 if the picture has glitches
-#define DISPLAY_ROTATION  0            // 0..3: turn the picture in 90° steps (fit to the case)
+#define DISPLAY_ROTATION  3            // 0..3: turn the picture in 90° steps (fit to the case).
+                                       // 3: the screen is mounted turned 90° clockwise in the case
 #define DISPLAY_FRAME_MS  100UL        // ~10 frames/s; one frame blocks loop() ~30 ms
 
 // ============ Water tank ==============

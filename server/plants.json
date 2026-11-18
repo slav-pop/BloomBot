@@ -1,0 +1,962 @@
+[
+  {
+    "id": 2275,
+    "name_de": "Alpenveilchen",
+    "common_name": "cyclamen",
+    "scientific_name": "Cyclamen persicum",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 1820,
+    "name_de": "Bergpalme",
+    "common_name": "parlor palm",
+    "scientific_name": "Chamaedorea elegans",
+    "sunlight": "part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 2954,
+    "name_de": "Birkenfeige",
+    "common_name": "weeping fig",
+    "scientific_name": "Ficus benjamina",
+    "sunlight": "part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9005,
+    "name_de": "Bogenhanf",
+    "common_name": "Snake plant",
+    "scientific_name": "Sansevieria trifasciata",
+    "sunlight": "full sun, part sun/part shade, part shade",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 14,
+        "maximum_days": 21
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
+    "id": 2468,
+    "name_de": "Dieffenbachie",
+    "common_name": "dumb cane",
+    "scientific_name": "Dieffenbachia seguine",
+    "sunlight": "filtered shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 2531,
+    "name_de": "Drachenbaum",
+    "common_name": "dragontree",
+    "scientific_name": "Dracaena marginata",
+    "sunlight": "part shade, full sun, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 2528,
+    "name_de": "Duftender Drachenbaum",
+    "common_name": "fragrant dracaena",
+    "scientific_name": "Dracaena fragrans",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9013,
+    "name_de": "Echeverie",
+    "common_name": "Mexican snowball",
+    "scientific_name": "Echeveria elegans",
+    "sunlight": "full sun, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 12,
+        "maximum_days": 18
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
+    "id": 728,
+    "name_de": "Echte Aloe",
+    "common_name": "aloe",
+    "scientific_name": "Aloe vera",
+    "sunlight": "full sun",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 10,
+        "maximum_days": 16
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
+    "id": 2773,
+    "name_de": "Efeutute",
+    "common_name": "golden pothos",
+    "scientific_name": "Epipremnum aureum",
+    "sunlight": "part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9003,
+    "name_de": "Einblatt",
+    "common_name": "Peace lily",
+    "scientific_name": "Spathiphyllum wallisii",
+    "sunlight": "part shade, full shade",
+    "irrigation_profile": {
+      "water_need_category": "high",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 45,
+        "recommended_target_percent": 65,
+        "maximum_safe_percent": 85
+      },
+      "watering_cycle": {
+        "minimum_days": 4,
+        "maximum_days": 6
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 160,
+        "minimum_water_ml": 100,
+        "maximum_water_ml": 800
+      }
+    }
+  },
+  {
+    "id": 1192,
+    "name_de": "Elefantenfuß",
+    "common_name": "ponytail palm",
+    "scientific_name": "Beaucarnea recurvata",
+    "sunlight": "part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9001,
+    "name_de": "Fensterblatt",
+    "common_name": "Swiss cheese plant",
+    "scientific_name": "Monstera deliciosa",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 7,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 855,
+    "name_de": "Flamingoblume",
+    "common_name": "anthurium",
+    "scientific_name": "Anthurium andraeanum",
+    "sunlight": "part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 543,
+    "name_de": "Frauenhaarfarn",
+    "common_name": "maidenhair fern",
+    "scientific_name": "Adiantum capillus-veneris",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 2,
+        "maximum_days": 3
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 2963,
+    "name_de": "Geigenfeige",
+    "common_name": "fiddle-leaf fig",
+    "scientific_name": "Ficus lyrata",
+    "sunlight": "part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9004,
+    "name_de": "Glücksfeder",
+    "common_name": "ZZ plant",
+    "scientific_name": "Zamioculcas zamiifolia",
+    "sunlight": "part shade, part sun/part shade, full shade",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 14,
+        "maximum_days": 21
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
+    "id": 9010,
+    "name_de": "Glückskastanie",
+    "common_name": "Money tree",
+    "scientific_name": "Pachira aquatica",
+    "sunlight": "part sun/part shade, part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 7,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 2568,
+    "name_de": "Goldfruchtpalme",
+    "common_name": "bamboo palm",
+    "scientific_name": "Dypsis lutescens",
+    "sunlight": "part sun/part shade, part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9012,
+    "name_de": "Goldkugelkaktus",
+    "common_name": "Golden barrel cactus",
+    "scientific_name": "Echinocactus grusonii",
+    "sunlight": "full sun",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 18,
+        "maximum_days": 25
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
+    "id": 1846,
+    "name_de": "Grünlilie",
+    "common_name": "spider plant",
+    "scientific_name": "Chlorophytum 'Bonnie'",
+    "sunlight": "part shade, filtered shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 2961,
+    "name_de": "Gummibaum",
+    "common_name": "Rubber plant",
+    "scientific_name": "Ficus elastica",
+    "sunlight": "full sun, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9015,
+    "name_de": "Guzmanie",
+    "common_name": "Scarlet star bromeliad",
+    "scientific_name": "Guzmania lingulata",
+    "sunlight": "part shade, filtered shade",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 10,
+        "maximum_days": 14
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
+    "id": 2193,
+    "name_de": "Jadebaum",
+    "common_name": "jade plant",
+    "scientific_name": "Crassula ovata",
+    "sunlight": "full sun",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 10,
+        "maximum_days": 16
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
+    "id": 2045,
+    "name_de": "Keulenlilie",
+    "common_name": "Ti plant",
+    "scientific_name": "Cordyline fruticosa",
+    "sunlight": "full sun, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9002,
+    "name_de": "Kletterphilodendron",
+    "common_name": "Heartleaf philodendron",
+    "scientific_name": "Philodendron hederaceum",
+    "sunlight": "part shade, part sun/part shade, full shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 7,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 626,
+    "name_de": "Kolbenfaden",
+    "common_name": "Chinese evergreen",
+    "scientific_name": "Aglaonema 'Cutlass'",
+    "sunlight": "part shade, full shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 1470,
+    "name_de": "Korbmarante",
+    "common_name": "Calathea",
+    "scientific_name": "Calathea makoyana",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 1214,
+    "name_de": "Königsbegonie",
+    "common_name": "rex begonia",
+    "scientific_name": "Begonia rex-cultorum",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9014,
+    "name_de": "Marante",
+    "common_name": "Prayer plant",
+    "scientific_name": "Maranta leuconeura",
+    "sunlight": "part shade, filtered shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 5,
+        "maximum_days": 7
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 2976,
+    "name_de": "Mosaikpflanze",
+    "common_name": "Nerve Plant",
+    "scientific_name": "Fittonia albivenis (Argyroneura Group)",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 1,
+        "maximum_days": 2
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 1038,
+    "name_de": "Nestfarn",
+    "common_name": "bird's nest fern",
+    "scientific_name": "Asplenium nidus 'Antiquum'",
+    "sunlight": "full sun, part shade, full shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 2,
+        "maximum_days": 3
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 710,
+    "name_de": "Pfeilblatt",
+    "common_name": "elephant's ear",
+    "scientific_name": "Alocasia amazonica",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 1036,
+    "name_de": "Schusterpalme",
+    "common_name": "cast-iron plant",
+    "scientific_name": "Aspidistra elatior",
+    "sunlight": "part shade, full shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9011,
+    "name_de": "Strahlenaralie",
+    "common_name": "Dwarf umbrella tree",
+    "scientific_name": "Schefflera arboricola",
+    "sunlight": "part sun/part shade, part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 7,
+        "maximum_days": 10
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9006,
+    "name_de": "Ufopflanze",
+    "common_name": "Chinese money plant",
+    "scientific_name": "Pilea peperomioides",
+    "sunlight": "part sun/part shade, part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 8
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9009,
+    "name_de": "Wachsblume",
+    "common_name": "Wax plant",
+    "scientific_name": "Hoya carnosa",
+    "sunlight": "part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 10,
+        "maximum_days": 14
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
+    "id": 1999,
+    "name_de": "Wunderstrauch",
+    "common_name": "croton",
+    "scientific_name": "Codiaeum variegatum",
+    "sunlight": "part shade, full sun",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 6,
+        "maximum_days": 9
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  },
+  {
+    "id": 9008,
+    "name_de": "Zebrakraut",
+    "common_name": "Inch plant",
+    "scientific_name": "Tradescantia zebrina",
+    "sunlight": "part sun/part shade, part shade",
+    "irrigation_profile": {
+      "water_need_category": "high",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 45,
+        "recommended_target_percent": 65,
+        "maximum_safe_percent": 85
+      },
+      "watering_cycle": {
+        "minimum_days": 4,
+        "maximum_days": 6
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 160,
+        "minimum_water_ml": 100,
+        "maximum_water_ml": 800
+      }
+    }
+  },
+  {
+    "id": 9007,
+    "name_de": "Zwergpfeffer",
+    "common_name": "Baby rubber plant",
+    "scientific_name": "Peperomia obtusifolia",
+    "sunlight": "part shade, part sun/part shade",
+    "irrigation_profile": {
+      "water_need_category": "medium",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 30,
+        "recommended_target_percent": 50,
+        "maximum_safe_percent": 70
+      },
+      "watering_cycle": {
+        "minimum_days": 9,
+        "maximum_days": 12
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 120,
+        "minimum_water_ml": 80,
+        "maximum_water_ml": 600
+      }
+    }
+  }
+]

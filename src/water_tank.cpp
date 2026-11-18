@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include "config.h"
 #include "state.h"
+#include "logger.h"
+#include "events.h"
 #include "water_tank.h"
 
 // ============================================================
@@ -21,6 +23,8 @@ static unsigned long lastPumpActiveAt = 0;   // when pump was last active
 // "circle" buffer of the last three valid measurements 0→1→2→0→1→2
 static float samples[3] = { -1, -1, -1};
 static uint8_t sampleIndex = 0;
+
+static uint8_t failCount = 0;                // failed readings in a row
 
 // ---- one "raw" distance measurement, cm; -1 for an error ----
 static float readDistanceOnce() {
@@ -79,8 +83,26 @@ void tankUpdate() {
 
   float d = readDistanceOnce();
   if (d < 0) {
-    // If errors occur in a row, can add a counter and a "sensor failed" status here later.
+    // One bad reading is normal (echo lost). Many in a row = sensor broken
+    // or disconnected: then the old value must not stay in 'state',
+    // otherwise the pump keeps trusting a level that is no longer measured.
+    if (failCount < 255) failCount++;
+    if (failCount >= TANK_MAX_FAILS && !state.tankSensorFail) {
+      state.tankSensorFail = true;
+      state.tankDistanceCm = -1;
+      state.tankPercent = -1;              // pump.cpp: -1 = no water -> pump blocked
+      samples[0] = samples[1] = samples[2] = -1;
+      Log.println("TANK: sensor failed (no echo), level unknown, pump blocked");
+      eventPush("error", 0, 0, "sensor_tank");
+    }
     return;
+  }
+
+  failCount = 0;
+  if (state.tankSensorFail) {
+    state.tankSensorFail = false;
+    Log.println("TANK: sensor OK again");
+    eventPush("error_cleared", 0, 0, "sensor_tank");
   }
 
   samples[sampleIndex] = d;
@@ -101,7 +123,9 @@ void tankUpdate() {
   // Hysteresis for the "low water" flag
   if (!state.tankLow && state.tankPercent < TANK_LOW_ON_PERCENT) {
     state.tankLow = true;
+    eventPush("tank_low", state.tankPercent);
   } else if (state.tankLow && state.tankPercent > TANK_LOW_OFF_PERCENT) {
     state.tankLow = false;
+    eventPush("tank_refilled", state.tankPercent);
   }
 }

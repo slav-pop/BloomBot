@@ -5,6 +5,11 @@
 .vscode/ipch
 .vscode/
 DB/
+src/secrets.h
+STATUS.md
+DECISIONS.md
+Claude outputs/
+Integration_ru.md
 
 # Web (app/, site/)
 node_modules/

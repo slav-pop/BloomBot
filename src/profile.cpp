@@ -86,6 +86,21 @@ bool profileApply(const Profile& p, const char** reason) {
     return true;
 }
 
+// ---- fair demo: use a profile without saving it (see profile.h) ----
+bool profileUseDemo(const Profile& p, const char** reason) {
+    const char* err = profileCheck(p);
+    if (err) {
+        if (reason) *reason = err;
+        Log.print("PROFILE: demo profile rejected - ");
+        Log.println(err);
+        return false;
+    }
+    state.profile = p;                      // RAM only, flash keeps the real profile
+    Log.print("PROFILE: demo plant in use (not saved): ");
+    Log.println(p.name);
+    return true;
+}
+
 // ---- at boot: load the saved profile, otherwise keep the defaults ----
 void profileBegin() {
     profileDefaults(state.profile);         // defaults first: they stay if loading fails

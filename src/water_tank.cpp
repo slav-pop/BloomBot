@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "events.h"
 #include "water_tank.h"
+#include "sim.h"
 
 // ============================================================
 //  water_tank.cpp — ultrasonic water level sensor.
@@ -118,7 +119,10 @@ void tankUpdate() {
 
   // --- Post the results to the shared state ---
   state.tankDistanceCm = filtered;
-  state.tankPercent = distanceToPercent(filtered);
+  int percent = distanceToPercent(filtered);
+  int simulated = simTankLimit();         // fair demo (sim.h): only LESS water than really there
+  if (simulated >= 0 && simulated < percent) percent = simulated;
+  state.tankPercent = percent;
 
   // Hysteresis for the "low water" flag
   if (!state.tankLow && state.tankPercent < TANK_LOW_ON_PERCENT) {

@@ -15,6 +15,9 @@
 #define PUMP_PIN       26   // relay module IN  - on PICO 15 Relais IN PIN
 #define MOISTURE_POWER_PIN  27  // VCC of both moisture sensors (3.3 V from GPIO)
 #define TANK_POWER_PIN      33  // breadboard only: VCC of HC-SR04 (no access to 3V3 pin)
+#define DISPLAY_DC_PIN      16  // screen DC  (label RX2)
+#define DISPLAY_RST_PIN     17  // screen RES (label TX2)
+// screen SCL -> 18, SDA -> 23: default hardware SPI pins, not set in code
 
 // ============ LED-strip ==============
 #define TOTAL_LEDS     60   // whole 1m of strip
@@ -22,6 +25,14 @@
 // #define BRIGHTNESS     200  // ATTENTION: on a real use set to ~30
 #define BRIGHTNESS     30   // real use 
 #define MAX_MILLIAMPS  500  // hard power limit
+
+// ============ Display ================
+// 1.3" IPS 240x240, ST7789 (module GMT130-V1.0)
+#define DISPLAY_ENABLED   1            // 0 = no screen connected
+#define DISPLAY_SPI_HZ    40000000UL   // lower to 20000000 if the picture has glitches
+#define DISPLAY_ROTATION  3            // 0..3: turn the picture in 90° steps (fit to the case).
+                                       // 3: the screen is mounted turned 90° clockwise in the case
+#define DISPLAY_FRAME_MS  100UL        // ~10 frames/s; one frame blocks loop() ~30 ms
 
 // ============ Water tank ==============
 // These two numbers need to be
@@ -109,6 +120,21 @@ static_assert(WATER_DOSE_ML <= DOSE_MAX_ML, "WATER_DOSE_ML is bigger than DOSE_M
 #else
   #define PAUSE_UNIT_MS  3600000UL
 #endif
+
+// ============ Fair demo plant (sim.h, demo/display_demo) ============
+// One default plant for the demo, when no plant profile came from the server.
+// Fensterblatt (Monstera deliciosa, id 9001) from server/plants.json, pot 1 l (bot default
+// DEFAULT_POT_L), numbers as the server's buildProfile() would send them:
+//   soil min/target/max 30/50/70 (soil_moisture)
+//   dose  = 120 ml per litre x 1 l = 120 ml  (one portion, <= DOSE_MAX_ML)
+//   pause = minimum_days 7 x 24 h x 0.5 (PAUSE_FACTOR) = 84 h  (84 s with WATER_TEST_TIMING)
+#define DEMO_PLANT_ID        9001
+#define DEMO_PLANT_NAME      "Fensterblatt"
+#define DEMO_MOIST_MIN       30
+#define DEMO_MOIST_TARGET    50
+#define DEMO_MOIST_MAX       70
+#define DEMO_DOSE_ML         120
+#define DEMO_MIN_PAUSE_H     84
 
 // ============ Wi-Fi / OTA =============
 // SSID and passwords live in src/secrets.h (not in git)

@@ -200,6 +200,15 @@
         </div>
 
         <div class="sim-panel">
+          <!-- Hausmesse: nur sichtbar über scripts/device-bridge.mjs (device.js) -->
+          <div class="mode-switch" data-mode-switch hidden>
+            <div class="mode-tabs" role="tablist" aria-label="Was die Szene zeigt">
+              <button type="button" role="tab" data-mode="sim" aria-selected="false">Simulation</button>
+              <button type="button" role="tab" data-mode="live" aria-selected="true">Echtes Gerät</button>
+            </div>
+            <span class="device-conn" data-device-conn role="status">Verbinde …</span>
+          </div>
+
           <div class="sim-status" role="status" aria-live="polite">
             <span class="status-led" aria-hidden="true"></span>
             <div>
@@ -223,24 +232,31 @@
             <div class="reading"><dt>Portion</dt><dd data-sim-portion>–</dd></div>
           </dl>
 
-          <fieldset class="segmented" aria-label="Pflanzenprofil">
+          <fieldset class="segmented sim-only" aria-label="Pflanzenprofil">
             <legend>Pflanzenprofil</legend>
             <label><input type="radio" name="plant" value="low"><span>Kaktus</span></label>
             <label><input type="radio" name="plant" value="medium" checked><span>Grünpflanze</span></label>
             <label><input type="radio" name="plant" value="high"><span>Farn</span></label>
           </fieldset>
 
-          <label class="range">
+          <label class="range sim-only">
             <span>Zeitraffer <output data-sim-speed-out>2×</output></span>
             <input type="range" min="1" max="8" step="1" value="2" data-sim-speed>
           </label>
 
-          <div class="sim-actions">
+          <div class="sim-actions sim-only">
             <button type="button" class="btn btn-light" data-sim-toggle>Pause</button>
             <button type="button" class="btn btn-outline-light" data-sim-refill>Tank auffüllen</button>
             <button type="button" class="btn btn-outline-light" data-sim-hose>Schlauch abziehen</button>
             <button type="button" class="btn btn-warn" data-sim-reset hidden>Fehler zurücksetzen</button>
           </div>
+        </div>
+
+        <!-- Hausmesse: Tasten für das echte Gerät (device.js), unter Szene und Anzeige -->
+        <div class="sim-keys live-only">
+          <div class="device-keys" data-live-keys aria-label="Befehle an den ESP32"></div>
+          <label class="key-toggle"><input type="checkbox" data-live-keyboard checked>
+            Tastatur steuert das Gerät – einfach den Buchstaben auf der Taste drücken</label>
         </div>
 
         <aside class="sim-log" aria-labelledby="log-title">
@@ -258,6 +274,7 @@
         <li><span class="swatch swatch-low" aria-hidden="true"></span><b>Orange</b>Tank auffüllen</li>
         <li><span class="swatch swatch-error" aria-hidden="true"></span><b>Rot, Doppelblitz</b>Fehler prüfen</li>
       </ul>
+
     </div>
   </section>
 

@@ -22,11 +22,12 @@ export default defineConfig({
     environment: 'happy-dom',
     restoreMocks: true,
     // Auch die Simulation der Homepage (site/js) wird hier mitgetestet.
-    include: ['src/**/*.test.js', '../site/js/**/*.test.js'],
+    // ... und die Brücke zum ESP32 (scripts/device-bridge.mjs).
+    include: ['src/**/*.test.js', '../site/js/**/*.test.js', '../scripts/**/*.test.mjs'],
     coverage: {
       provider: 'v8',
       allowExternal: true,
-      include: ['src/**/*.{js,vue}', '../site/js/*.js'],
+      include: ['src/**/*.{js,vue}', '../site/js/*.js', '../scripts/*.mjs'],
       exclude: ['src/main.js'],
       thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
     },

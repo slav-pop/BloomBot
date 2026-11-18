@@ -594,3 +594,97 @@ h3 { font-size: 1.15rem; font-weight: 650; line-height: 1.3; letter-spacing: -0.
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .led-strip .led, .scene-leds circle { opacity: 1 !important; }
 }
+
+/* ============ Echtes Gerät in der Simulation (Hausmesse, device.js) ============ */
+:root { --led-connecting: #E8ECF2; --led-idle: #B98CFF; }
+.sim:not([data-mode="live"]) .live-only { display: none; }
+.sim[data-mode="live"] .sim-only { display: none; }
+
+.mode-switch { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.mode-switch[hidden] { display: none; }
+.mode-tabs { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 99px; background: rgb(255 255 255 / 6%); }
+.mode-tabs button {
+  padding: 8px 16px; border: 0; border-radius: 99px; background: transparent;
+  color: var(--night-soft); font: inherit; font-size: 0.88rem; font-weight: 650; cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+.mode-tabs button[aria-selected="true"] { background: var(--night-ink); color: var(--night); }
+.mode-tabs button:focus-visible { outline: 3px solid var(--water); outline-offset: 2px; }
+.device-conn { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--night-soft); }
+.device-conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--led-error); box-shadow: 0 0 8px var(--led-error); }
+.device-conn.is-on { color: var(--night-ink); }
+.device-conn.is-on::before { background: var(--led-okay); box-shadow: 0 0 8px var(--led-okay); animation: breathe 2.4s ease-in-out infinite; }
+
+.sim[data-mode="live"] { grid-template-areas: "stage panel" "keys keys" "log log"; }
+.sim-keys {
+  grid-area: keys; display: grid; gap: 18px; padding: 22px 24px;
+  border: 1px solid var(--night-line); border-radius: var(--radius-xl); background: var(--night-2);
+}
+.device-keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px 28px; align-items: start; }
+.key-group { display: grid; gap: 8px; }
+.key-group[hidden] { display: none; }
+.key-group h4 { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--night-soft); }
+.key-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+
+/* Tasten wie Tastenkappen: Buchstabe oben links, Farbpunkt = Szene/LED-Farbe, drücken = einsinken */
+.key {
+  --key-c: transparent;
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 10px;
+  min-height: 70px; padding: 9px 11px 11px;
+  border: 1px solid var(--night-line); border-radius: 14px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 8%), rgb(255 255 255 / 2.5%));
+  box-shadow: 0 4px 0 #0A0D09, inset 0 1px 0 rgb(255 255 255 / 9%);
+  color: var(--night-ink); font: inherit; font-size: 0.84rem; font-weight: 600; line-height: 1.2; text-align: left;
+  cursor: pointer;
+  transition: transform 0.09s ease-out, box-shadow 0.09s ease-out, border-color 0.2s, background-color 0.2s;
+}
+.key[hidden] { display: none; }
+.key kbd {
+  min-width: 26px; padding: 3px 7px; border-radius: 7px;
+  background: rgb(0 0 0 / 35%); box-shadow: inset 0 -1px 0 rgb(255 255 255 / 8%);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; font-weight: 700; text-align: center;
+  color: var(--night-ink);
+}
+.key[data-tone]::after {
+  content: ""; position: absolute; top: 12px; right: 12px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--key-c); box-shadow: 0 0 10px var(--key-c);
+}
+.key[data-tone="okay"] { --key-c: var(--led-okay); }
+.key[data-tone="need"] { --key-c: var(--led-need); }
+.key[data-tone="watering"] { --key-c: var(--led-watering); }
+.key[data-tone="low"] { --key-c: var(--led-low); }
+.key[data-tone="error"] { --key-c: var(--led-error); }
+.key[data-tone="connecting"] { --key-c: var(--led-connecting); }
+.key[data-tone="idle"] { --key-c: var(--led-idle); }
+.key:hover { border-color: color-mix(in srgb, var(--key-c) 60%, var(--night-soft)); transform: translateY(-1px); box-shadow: 0 5px 0 #0A0D09, inset 0 1px 0 rgb(255 255 255 / 12%); }
+.key:active, .key.is-pressed {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #0A0D09, 0 0 22px -6px var(--key-c), inset 0 1px 0 rgb(255 255 255 / 6%);
+  border-color: color-mix(in srgb, var(--key-c) 80%, var(--night-ink));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--key-c) 22%, transparent), rgb(255 255 255 / 2%));
+}
+.key:not([data-tone]).is-pressed { --key-c: var(--water); }
+.key:focus-visible { outline: 3px solid var(--water); outline-offset: 2px; }
+
+.key-group-compact .key-row { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); }
+.key-group-compact .key { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; min-height: 0; padding: 7px 10px; box-shadow: 0 2px 0 #0A0D09; font-size: 0.8rem; color: var(--night-soft); }
+.key-group-compact .key:active, .key-group-compact .key.is-pressed { transform: translateY(2px); }
+
+.key-toggle { display: flex; align-items: center; gap: 10px; font-size: 0.84rem; color: var(--night-soft); }
+.key-toggle input { accent-color: var(--led-okay); }
+
+.sim-log li[data-type="sim"] code { color: #9FD3E6; }
+.sim-log li[data-type="fehler"] { color: #FF8A80; }
+
+@media (max-width: 520px) {
+  .key-row { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+}
+
+/* LED-Leiste: Zustände der echten Firmware, die die Browser-Simulation nicht kennt (src/leds.cpp) */
+.led-strip[data-status="idle"] .led { --c: hsl(calc(var(--i) * 24) 85% 60%); background: var(--c); animation: breathe 3s ease-in-out infinite; }
+.led-strip[data-status="connecting"] .led { --c: var(--led-connecting); background: var(--c); animation: comet 1.2s linear infinite; animation-delay: calc(var(--i) * 80ms - 1.2s); }
+@media (max-width: 920px) {
+  .sim[data-mode="live"] { grid-template-areas: "stage" "panel" "keys" "log"; }
+  .device-keys { grid-template-columns: 1fr; }
+}

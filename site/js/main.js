@@ -12,12 +12,11 @@ import {
   step,
   tankPercent,
 } from './simulation.js'
+import { initDeviceMode } from './device.js'
+import { createScene } from './scene.js'
 
-const LED_COUNT = 15 // ACTIVE_LEDS in src/config.h
 const MAX_FRAME_SEC = 0.1
 const MAX_LOG_ENTRIES = 30
-const TANK_TOP = 74
-const TANK_HEIGHT = 182
 
 const STATUS_TEXT = {
   okay: 'Alles gut',
@@ -25,14 +24,6 @@ const STATUS_TEXT = {
   watering: 'Pumpe läuft …',
   low: 'Wenig Wasser im Tank',
   error: 'Fehler: Erde bleibt trocken',
-}
-
-const STATUS_COLOR = {
-  okay: 'var(--led-okay)',
-  need: 'var(--led-need)',
-  watering: 'var(--led-watering)',
-  low: 'var(--led-low)',
-  error: 'var(--led-error)',
 }
 
 // Texte wie die geplanten Bot-Nachrichten in Integration.md §4.
@@ -53,25 +44,10 @@ function formatClock(seconds) {
   return `Tag ${day}, ${hh}:${mm}`
 }
 
-function setText(node, text) {
-  if (node.textContent !== text) node.textContent = text
-}
-
 function initSimulation(root) {
   const $ = (selector) => root.querySelector(selector)
+  const scene = createScene(root)
   const el = {
-    leds: $('[data-sim-leds]'),
-    water: $('[data-sim-water]'),
-    soil: $('[data-sim-soil]'),
-    status: $('[data-sim-status]'),
-    statusLed: root.querySelector('.status-led'),
-    phase: $('[data-sim-phase]'),
-    moisture: $('[data-sim-moisture]'),
-    band: $('[data-sim-band]'),
-    target: $('[data-sim-target]'),
-    needle: $('[data-sim-needle]'),
-    tank: $('[data-sim-tank]'),
-    portion: $('[data-sim-portion]'),
     speed: $('[data-sim-speed]'),
     speedOut: $('[data-sim-speed-out]'),
     toggle: $('[data-sim-toggle]'),
@@ -85,13 +61,6 @@ function initSimulation(root) {
   let running = true
   let visible = true
   let lastFrame = performance.now()
-
-  for (let i = 0; i < LED_COUNT; i++) {
-    const led = document.createElement('span')
-    led.className = 'led'
-    led.style.setProperty('--i', String(i))
-    el.leds.append(led)
-  }
 
   function log(events) {
     for (const event of events) {
@@ -122,46 +91,39 @@ function initSimulation(root) {
   function render() {
     const plant = PLANT_TYPES[sim.plantKey]
     const status = ledStatus(sim)
-    const tank = tankPercent(sim)
-
-    el.leds.dataset.status = status
-    root.style.setProperty('--status-color', STATUS_COLOR[status])
-    el.statusLed.style.setProperty('--status-color', STATUS_COLOR[status])
-
-    const statusText = status === 'low' && sim.phase === PHASE.TANK_EMPTY ? 'Tank leer, bitte auffüllen' : STATUS_TEXT[status]
-    setText(el.status, statusText)
-    setText(el.phase, sim.phase)
-
-    setText(el.moisture, `${Math.round(sim.moisture)} %`)
-    el.band.style.left = `${plant.moistMin}%`
-    el.band.style.width = `${plant.moistMax - plant.moistMin}%`
-    el.target.style.left = `${plant.moistTarget}%`
-    el.needle.style.left = `${sim.moisture}%`
-
-    setText(el.tank, `${tank} %`)
     const inCycle = sim.phase === PHASE.PUMPING || sim.phase === PHASE.SOAKING
-    setText(el.portion, inCycle ? `${sim.attempts}/${SIM.maxPortions} · ${plant.doseMl} ml` : `${plant.doseMl} ml`)
-
-    const waterHeight = (sim.tankMl / SIM.tankCapacityMl) * TANK_HEIGHT
-    el.water.setAttribute('y', String(TANK_TOP + TANK_HEIGHT - waterHeight))
-    el.water.setAttribute('height', String(waterHeight))
-
-    // trocken: hellbraun → feucht: dunkelbraun
-    const t = sim.moisture / 100
-    el.soil.setAttribute('fill', `rgb(${Math.round(176 - t * 96)},${Math.round(138 - t * 84)},${Math.round(100 - t * 66)})`)
-
-    root.classList.toggle('is-pumping', sim.phase === PHASE.PUMPING)
-    root.classList.toggle('is-dry', sim.moisture < plant.moistMin)
-    root.classList.toggle('is-unplugged', !sim.hoseConnected)
+    scene.render({
+      status,
+      statusText: status === 'low' && sim.phase === PHASE.TANK_EMPTY ? 'Tank leer, bitte auffüllen' : STATUS_TEXT[status],
+      phase: sim.phase,
+      moisture: sim.moisture,
+      moistureText: `${Math.round(sim.moisture)} %`,
+      min: plant.moistMin,
+      target: plant.moistTarget,
+      max: plant.moistMax,
+      tankText: `${tankPercent(sim)} %`,
+      tankFraction: sim.tankMl / SIM.tankCapacityMl,
+      portionText: inCycle ? `${sim.attempts}/${SIM.maxPortions} · ${plant.doseMl} ml` : `${plant.doseMl} ml`,
+      pumping: sim.phase === PHASE.PUMPING,
+      dry: sim.moisture < plant.moistMin,
+      unplugged: !sim.hoseConnected,
+    })
     el.reset.hidden = sim.phase !== PHASE.ERROR
   }
+
+  const isLive = () => root.dataset.mode === 'live'
 
   function frame(now) {
     const dt = Math.min(MAX_FRAME_SEC, (now - lastFrame) / 1000)
     lastFrame = now
-    if (running && visible) apply(step(sim, dt, Number(el.speed.value)))
+    if (running && visible && !isLive()) apply(step(sim, dt, Number(el.speed.value)))
     requestAnimationFrame(frame)
   }
+
+  // Zurück vom echten Gerät: wieder die Simulation zeigen
+  root.addEventListener('bloombot:mode', () => {
+    if (!isLive()) render()
+  })
 
   el.speed.addEventListener('input', () => {
     el.speedOut.value = `${el.speed.value}×`
@@ -199,4 +161,8 @@ function initSimulation(root) {
 }
 
 const simRoot = document.querySelector('[data-sim]')
-if (simRoot) initSimulation(simRoot)
+if (simRoot) {
+  initSimulation(simRoot)
+  // Hausmesse: dieselbe Szene zeigt das echte Gerät (nur über scripts/device-bridge.mjs)
+  initDeviceMode(simRoot)
+}

@@ -51,6 +51,8 @@ async function load({ reducedMotion = false } = {}) {
     },
   )
   vi.stubGlobal('matchMedia', (query) => ({ matches: reducedMotion && query.includes('reduce') }))
+  // keine Brücke (scripts/device-bridge.mjs) im Test: "Echtes Gerät" bleibt aus
+  vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('no bridge'))))
   await import('./main.js')
 }
 
@@ -139,6 +141,27 @@ describe('homepage simulation', () => {
   it('caps the log length', () => {
     for (let i = 0; i < 40; i++) $('[data-sim-refill]').click()
     expect(document.querySelectorAll('[data-sim-log] li')).toHaveLength(30)
+  })
+})
+
+describe('real device mode (Hausmesse)', () => {
+  it('pauses the simulation while the scene shows the real device', () => {
+    const root = $('[data-sim]')
+    root.dataset.mode = 'live'
+    $('[data-sim-moisture]').textContent = '24 / 100' // drawn by device.js
+    frames(200)
+    expect($('[data-sim-moisture]').textContent).toBe('24 / 100')
+    root.dataset.mode = 'sim'
+    root.dispatchEvent(new CustomEvent('bloombot:mode'))
+    expect($('[data-sim-moisture]').textContent).toMatch(/^\d+ %$/)
+  })
+
+  it('does not redraw when switching to the real device', () => {
+    const root = $('[data-sim]')
+    root.dataset.mode = 'live'
+    $('[data-sim-moisture]').textContent = '24 / 100'
+    root.dispatchEvent(new CustomEvent('bloombot:mode'))
+    expect($('[data-sim-moisture]').textContent).toBe('24 / 100')
   })
 })
 

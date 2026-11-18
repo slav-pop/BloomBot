@@ -188,13 +188,15 @@ describe('device mode', () => {
     FakeEventSource.last.emit({ type: 'state', state: { ...STATE, firmware: 'demo', tour: true } })
     expect(root.dataset.firmware).toBe('demo')
     expect(key('H').hidden).toBe(true)
+    expect(key('o').textContent).toContain('Alles zurück')
     expect(key('d').hidden).toBe(false)
     expect(q('[data-group="demo"]').hidden).toBe(false)
-    expect(key('n').textContent).toContain('Nächste Pflanze')
+    expect(key('n').hidden).toBe(true) // the demo has one plant only
     expect(q('[data-device-conn]').textContent).toBe('ESP32 verbunden · Bildschirm-Demo')
     FakeEventSource.last.emit({ type: 'state', state: STATE })
     expect(key('H').hidden).toBe(false)
-    expect(key('n').textContent).toContain('Status an Server')
+    expect(key('n').hidden).toBe(false)
+    expect(key('o').textContent).toContain('Echte Sensoren')
   })
 
   it('writes device lines into the event log and keeps it short', async () => {

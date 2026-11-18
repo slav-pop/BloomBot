@@ -20,7 +20,7 @@ export const COMMANDS = Object.freeze([
   { key: 'w', group: 'device', label: 'Jetzt gießen', tone: 'watering' },
   { key: 'r', group: 'device', label: 'Fehler zurücksetzen' },
   { key: 'm', group: 'device', label: 'Erde messen' },
-  { key: 'n', group: 'device', label: 'Status an Server', demoLabel: 'Nächste Pflanze' },
+  { key: 'n', group: 'device', label: 'Status an Server', only: 'main' },
   { key: 's', group: 'info', label: 'Gießstatus' },
   { key: 't', group: 'info', label: 'Tank' },
   { key: 'i', group: 'info', label: 'WLAN' },

@@ -3,6 +3,7 @@
 #include "moisture.h"
 #include "state.h"
 #include "events.h"
+#include "sim.h"
 #include <algorithm>  // std::sort
 
 // ============================================================
@@ -84,6 +85,13 @@ void moistureUpdate() {
         state.moistureMismatch = abs(a - b) > MOISTURE_MISMATCH_DIFF;
     } else {
         state.moistureIndex = (a >= 0) ? a : b;   // the working one, or -1
+        state.moistureMismatch = false;
+    }
+    int simulated = simSoil();              // fair demo (sim.h): value from the web page
+    if (simulated >= 0) {
+        state.moistureSensorIndex[0] = simulated;
+        state.moistureSensorIndex[1] = simulated;
+        state.moistureIndex = simulated;
         state.moistureMismatch = false;
     }
     bool failed = (state.moistureIndex < 0);

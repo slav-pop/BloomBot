@@ -91,9 +91,43 @@ static void setError(int i) {
 
 static void printHelp() {
   Log.println("DEMO commands: 0-6 mood, d tour on/off, +/- soil, ]/[ tank, n plant, x error, f frame/memory, i wifi, h help");
+  Log.println("Web page keys (same as the real firmware, played as moods): D w L V r o a m s t j");
+}
+
+// Status line for the web page (scripts/device-bridge.mjs), same format as src/sim.cpp
+static void printState() {
+  const char* err = state.errorReason ? state.errorReason
+                  : state.tankSensorFail ? "sensor_tank"
+                  : state.moistureSensorFail ? "sensor_moisture" : "";
+  Log.printf("STATE {\"fw\":\"demo\",\"st\":%d,\"ph\":\"DEMO\",\"soil\":%d,\"tank\":%d,\"need\":%d,"
+             "\"att\":0,\"err\":\"%s\",\"last\":0,\"total\":0,\"wifi\":%d,"
+             "\"sim\":{\"soil\":%d,\"tank\":%d,\"hose\":1},\"min\":%d,\"tgt\":%d,\"max\":%d,\"tour\":%d}\r\n",
+             (int)state.ledStatus, state.moistureIndex, state.tankPercent,
+             state.ledStatus == STATUS_NEED_WATER ? 1 : 0, err, state.wifiConnected ? 1 : 0,
+             state.moistureIndex, state.tankPercent,
+             DEFAULT_MOIST_MIN, DEFAULT_MOIST_TARGET, DEFAULT_MOIST_MAX, tourOn ? 1 : 0);
+}
+
+// Keys of the real firmware (src/main.cpp, src/sim.h), played as moods: no pump here
+static bool handleWebKey(char ch) {
+  switch (ch) {
+    case 'j': printState(); return true;
+    case 'D': tourOn = false; state.moistureIndex = DEFAULT_MOIST_MIN - 10; setStatus(STATUS_NEED_WATER); return true;
+    case 'w': tourOn = false; setStatus(STATUS_WATERING); return true;
+    case 'L': tourOn = false; setStatus(STATUS_LOW_WATER); return true;
+    case 'V': tourOn = false; setStatus(STATUS_OKAY); state.tankPercent = 100; return true;
+    case 'r':
+    case 'o': tourOn = false; errorPos = 0; setError(0); state.moistureIndex = 42; setStatus(STATUS_OKAY); return true;
+    case 'a': tourOn = true; tourStepAt = millis(); Log.println("-> tour ON"); return true;
+    case 'm':
+    case 's':
+    case 't': Log.printf("DEMO: soil %d, tank %d %% (no sensors, no pump)\r\n", state.moistureIndex, state.tankPercent); return true;
+    default:  return false;
+  }
 }
 
 static void handleCommand(char ch) {
+  if (handleWebKey(ch)) return;
   if (ch >= '0' && ch <= '6') {
     tourOn = false;                       // manual choice stops the tour
     setStatus((LedStatus)(ch - '0'));

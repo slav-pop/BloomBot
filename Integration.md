@@ -230,7 +230,8 @@ Das Gerät kennt die Pflanzendatenbank **nicht**. Der Server berechnet einige Za
   sendet `profile_rejected`. Andernfalls speichert es das Profil im NVS und sendet `profile_ok`.
 - Der Server sendet das Profil bei jeder Abfrage, bis der Status die neue `profile_ver` zeigt.
 - **Der Modus `eco` ist für das Gerät einfach ein anderes Profil.** Das Gerät braucht
-  keine eigene Logik: Der Server schickt einen niedrigeren `moist_target`.
+  keine eigene Logik: Der Server schickt einen niedrigeren `moist_target` und eine kleinere
+  `dose_ml` (Abschnitt 7).
 
 ## 6. Befehle (Feld `commands` in der Poll-Antwort)
 
@@ -258,33 +259,45 @@ Das eigentliche Ergebnis kommt als Ereignis `error_cleared`.
 
 ## 7. Prognose des Wasservorrats und Urlaubsmodus (nur Server)
 
-> **Stand:** geplant, noch nicht umgesetzt. Das Gerät liefert bereits alle nötigen Daten
-> (`total_pumped_ml`, `tank_pct`, `tank_capacity_ml`), es fehlt nur der Teil auf dem Server.
+> **Stand:** umgesetzt im Worker (Branch `integration`). Vor dem Deploy einmal
+> `server/migrations/0001_water_warned.sql` in der D1-Konsole ausführen.
 
 ### Prognose
 
 ```
 remaining_ml = (tank_pct − 5) / 100 × tank_capacity_ml     # 5 % = Reserve, die die Pumpe nicht ansaugt
-daily_ml     = in den letzten 7 Tagen gepumpt / Anzahl Tage mit Daten
+daily_ml     = im Messfenster gepumpt / Länge des Messfensters in Tagen
 days_left    = remaining_ml / daily_ml
 ```
+
+- **Messfenster:** die letzten max(7, 2 × `days_max`) Tage, höchstens 60, aber erst ab
+  `forecast_since` (neue Pflanze oder anderer Modus → neu anfangen). Tage ohne Gießen zählen mit.
 
 - Den Verbrauch in ml berechnet der Server aus der Differenz von `total_pumped_ml`
   zwischen den Abfragen. Ist der Wert gesunken, wurde das Gerät neu gestartet:
   Der neue Wert zählt vollständig als Verbrauch.
-- Solange Daten für weniger als 2 Tage vorliegen, wird eine Schätzung aus der DB verwendet:
+- Solange das Fenster kürzer als max(2, `days_max`) Tage ist (mindestens ein ganzer Gießzyklus)
+  oder darin noch nichts gepumpt wurde, wird eine Schätzung aus der DB verwendet:
   `daily_ml ≈ dose_ml / ((watering_cycle.minimum_days + maximum_days) / 2)`.
-- Als Bereich anzeigen (±20 %), z. B. „≈ 9–12 Tage“: Der Verbrauch hängt vom
-  Wetter, der Heizung und dem Wachstum der Pflanze ab.
+  Sonst würde z. B. ein Kaktus, der in den ersten 5 Tagen nicht gegossen wurde, „0 ml pro Tag“ zeigen.
+- Der Server rechnet intern immer mit dem Verbrauch im Modus `normal`; `eco` = × 0,7.
+  Wurde im `eco`-Modus gemessen, wird durch 0,7 geteilt.
+- Der Verbrauch wird pro Tag (deutsche Zeit) in der Tabelle `consumption` summiert.
+- Als Bereich anzeigen (±20 %), z. B. „etwa 8–13 Tage“: Der Verbrauch hängt vom
+  Wetter, der Heizung und dem Wachstum der Pflanze ab. Über 60 Tage: „mehr als 60 Tage“.
+  „Status“ zeigt dazu, ob es eine Schätzung ist oder nach bisherigem Verbrauch berechnet.
 
 Benachrichtigungen:
-- nach dem Auffüllen des Tanks (`tank_refilled`): „reicht für etwa N Tage“;
-- wenn `days_left` < 3: „Wasser reicht noch für etwa N Tage“;
-- einmal pro Woche eine kurze Zusammenfassung (optional, per Cron Trigger).
+- bei `tank_refilled` und `tank_low`: die Nachricht bekommt „Das Wasser reicht für etwa N Tage“;
+- wenn `days_left` < 3: „Das Wasser reicht nur noch für etwa N Tage“, **einmal pro Tankfüllung**
+  (`devices.water_warned`, wird bei `tank_refilled` und beim Zurücksetzen wieder 0);
+- geprüft wird bei jeder Abfrage des Geräts, ein Cron Trigger ist nicht nötig;
+- einmal pro Woche eine kurze Zusammenfassung (optional, später).
 
 ### Urlaubsmodus
 
-Der Benutzer gibt nur das **Rückkehrdatum** an. Alles andere entscheidet das System selbst:
+Der Benutzer gibt nur das **Rückkehrdatum** an: Button „Urlaub“ → 3 Tage / 1 Woche /
+2 Wochen / 3 Wochen, oder `/urlaub 24.12.`. Alles andere entscheidet das System selbst:
 
 1. `days_left` ≥ Tage bis zur Rückkehr + 1 Tag Reserve → „Alles in Ordnung, das Wasser reicht bis ~25.11.“
 2. Reicht nicht, aber im `eco`-Modus schon → der Bot schlägt vor: „Das Wasser reicht nur bis 16.11.
@@ -292,12 +305,18 @@ Der Benutzer gibt nur das **Rückkehrdatum** an. Alles andere entscheidet das Sy
 3. Reicht nicht einmal im `eco`-Modus → sagt es direkt: „Selbst im Sparmodus reicht das Wasser nicht.
    Bitten Sie jemanden, nachzufüllen, oder stellen Sie einen größeren Tank auf.“
 
-Am Rückkehrtag wird der Modus `eco` automatisch ausgeschaltet (wieder `normal`).
+In den Fällen 2 und 3 wählt der Benutzer per Button: Sparmodus an oder normal.
+Am Rückkehrtag (bei der ersten Abfrage an diesem Tag) endet der Urlaubsmodus automatisch,
+`eco` wird ausgeschaltet (wieder `normal`), alle mit Zugriff bekommen „Willkommen zurück!“.
+„Urlaub beenden“ beendet ihn sofort.
 
 Modus `eco`:
 - `moist_target = moist_min + round((moist_target − moist_min) × 0.3)`, aber mindestens
   `moist_min + 3` (Koeffizient **TBD**). Der Boden wird an der unteren sicheren
   Grenze für diese Pflanze gehalten.
+- `dose_ml × 0.7` (mindestens 10). Ohne kleinere Portion würde eine große Portion
+  über das niedrigere Ziel hinausschießen, und es würde nichts gespart.
+- Auch ohne Urlaub ein- und ausschaltbar: Button „Sparmodus an/aus“ in „Status“.
 - Die Einsparung wird anfangs als `daily_ml × 0.7` geschätzt (**TBD**). Nach einigen Tagen
   wird die Prognose anhand des tatsächlichen Verbrauchs neu berechnet.
 - Der Benutzer legt Gießmenge oder -häufigkeit **nicht** manuell fest: Die Werte bleiben
@@ -307,7 +326,7 @@ Modus `eco`:
 
 | Button / Befehl | Wer | Aktion |
 |---|---|---|
-| Status | alle | letzter Status + Alter („vor 4 min“), Fehler; geplant: `days_left` |
+| Status | alle | letzter Status + Alter („vor 4 min“), Fehler, Wasservorrat in Tagen, Urlaub/Sparmodus |
 | Pflanze | Besitzer | „Meine Pflanzen“ oder Suche im Katalog, Topf wählen, Profil speichern |
 | Topf | Besitzer | Topfvolumen in Litern |
 | Teilen | Besitzer | Einladungslink (24 h, einmal nutzbar), Mitglieder entfernen |
@@ -317,8 +336,8 @@ Modus `eco`:
 | QR-Code / `/link <Code>` | alle | Gerät koppeln (`/start pair_<Code>` aus dem QR-Code), wer koppelt, wird Besitzer |
 | `/konto_loeschen` | alle | eigenes Konto und alle Daten löschen; eigene Geräte werden zurückgesetzt |
 | `/admin_reset [id]` | nur `ADMIN_IDS` | Gerät zurücksetzen, egal wem es gehört (für Vorführungen) |
-| Urlaub | Besitzer | **geplant:** Rückkehrdatum → Prüfung → bei Bedarf `eco` |
-| Urlaub aus | Besitzer | **geplant:** wieder `normal` |
+| Urlaub, `/urlaub TT.MM.` | Besitzer | Rückkehrdatum → Prüfung → bei Bedarf `eco`; während des Urlaubs: „Urlaub beenden“ |
+| Sparmodus an / aus | Besitzer | Button in „Status“, `eco` ohne Urlaub |
 
 ## 8. Gießlogik auf dem Gerät (zum Verständnis)
 
@@ -342,10 +361,9 @@ zeigen, ob die DB-Werte korrigiert werden müssen.
 ## 9. Offene Fragen
 
 - **TBD** Koeffizient für `min_pause_h`
-- **TBD** Koeffizienten des `eco`-Modus (Feuchteniveau 0,3, Einsparung 0,7) – in der Praxis prüfen
+- **TBD** Koeffizienten des `eco`-Modus (Feuchteniveau 0,3, Portion 0,7, Einsparung 0,7) – in der Praxis prüfen
 - **TBD** tatsächliches Tankvolumen → `TANK_CAPACITY_ML` in `config.h`
 - **TBD** Schema der Geräte-ID (fester Name oder nach MAC) und ein eigener Schlüssel pro Gerät
   (`devices.key_hash`; zurzeit haben alle Geräte den gemeinsamen Schlüssel `DEVICE_KEY`)
-- **Geplant:** Prognose des Wasservorrats, Modus `eco`, Urlaubsmodus (Abschnitt 7)
 - **Geplant:** Auswahl des Geräts im Bot, wenn ein Nutzer mehrere Geräte besitzt
 - Tanksensor HC-SR04 ist nicht wasserdicht: vor Spritzwasser und Kondenswasser schützen

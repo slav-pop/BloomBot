@@ -24,19 +24,19 @@ static float tank = -1;          // -1 = real sensor only
 static bool  hoseOff = false;    // true: pumped water does not reach the soil
 static bool  wasPumping = false;
 static uint32_t glassStartMl = 0;   // state.totalPumpedMl when the glass was emptied ('G')
+static bool  demoUsed = false;      // a simulated value was set since boot: the hose is in the glass
 static bool  glassFullLogged = false;
 
 static int clampIndex(int v) { return constrain(v, 0, 100); }
-
-static bool simActive() { return soil >= 0 || tank >= 0; }
 
 static uint32_t glassMl() { return state.totalPumpedMl - glassStartMl; }
 
 // Glass budget: while the demo runs, the hose ends in a glass, not in a pot.
 // Visitors may press "water now" again and again - after SIM_GLASS_BUDGET_ML the
 // tank counts as empty (pump.cpp -> TANK_EMPTY). Only 'G' (terminal, not the web
-// page) and a reboot start a new glass; 'o' does not, so the limit can not be skipped.
-static bool glassFull() { return simActive() && glassMl() >= SIM_GLASS_BUDGET_ML; }
+// page) and a reboot start a new glass; 'o' does not, so the limit can not be skipped:
+// it depends on demoUsed (stays true until reboot), not on the current simulated values.
+static bool glassFull() { return demoUsed && glassMl() >= SIM_GLASS_BUDGET_ML; }
 
 int simSoil() { return soil; }
 
@@ -55,6 +55,7 @@ int simTankLimit() {
 // The screen and the web page show the new value at once; the pump uses it
 // at its next soil check (moisture.cpp asks simSoil() after every measurement)
 static void setSoil(int v) {
+  demoUsed = true;
   soil = clampIndex(v);
   state.moistureIndex = soil;
   state.moistureSensorFail = false;   // simulated soil hides a broken real sensor (by design)
@@ -66,6 +67,7 @@ static void setSoil(int v) {
 
 // Used by water_tank.cpp at its next reading (every 2 s, faster while pumping)
 static void setTank(float v) {
+  demoUsed = true;
   tank = constrain(v, 0.0f, 100.0f);
   Log.printf("SIM: tank %d %% (never more than the real tank)\r\n", (int)(tank + 0.5f));
 }
@@ -102,7 +104,7 @@ static void printState() {
              (unsigned long)state.totalPumpedMl, state.wifiConnected ? 1 : 0,
              soil, simTankLimit(), hoseOff ? 0 : 1,
              state.profile.moistMin, state.profile.moistTarget, state.profile.moistMax,
-             (unsigned long)(simActive() ? glassMl() : 0), (unsigned long)SIM_GLASS_BUDGET_ML);
+             (unsigned long)(demoUsed ? glassMl() : 0), (unsigned long)SIM_GLASS_BUDGET_ML);
 }
 
 bool simHandleCommand(char c) {

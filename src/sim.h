@@ -19,8 +19,9 @@
 //  Safety: the simulated tank can only show LESS water than the real sensor
 //  measures, never more - the pump can not run dry because of the demo.
 //  A failed real tank sensor still blocks the pump.
-//  Glass budget: while simulating, after 300 ml in the glass the tank counts as
-//  empty (stops visitors from pumping the whole tank next to the electronics).
+//  Glass budget: once the demo was used (until reboot, also after 'o'), after 300 ml
+//  in the glass the tank counts as empty (stops visitors from pumping the whole tank
+//  next to the electronics). Only 'G' (terminal) or a reboot starts a new glass.
 //  The simulated soil also hides a broken real soil sensor - demo only.
 // ============================================================
 

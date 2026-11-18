@@ -290,8 +290,12 @@ function searchSpecies(query) {
 
 // species + pot -> numbers for the device
 function buildProfile(s, potL, ver, mode, name) {
-  let dose = Math.round(s.ml_per_l * potL);
-  dose = Math.min(Math.max(dose, s.ml_min), s.ml_max, DOSE_MAX_ML);
+  // total water for one watering cycle, from the plant database
+  let need = Math.round(s.ml_per_l * potL);
+  need = Math.min(Math.max(need, s.ml_min), s.ml_max);
+  // split it into equal portions, each at most DOSE_MAX_ML (pump limit)
+  const portions = Math.ceil(need / DOSE_MAX_ML);
+  const dose = Math.round(need / portions);
   return {
     profile_ver: ver,
     plant_id: s.id,
@@ -327,7 +331,7 @@ async function assignPlant(env, dev, plantId) {
     `${devLabel(dev.name)} kümmert sich jetzt um: ${plantName(plant)} (${s.sci})`,
     `Topf: ${plant.pot_liters ?? DEFAULT_POT_L} l`,
     `Gießen bei Bodenfeuchte unter ${profile.moist_min}, bis ${profile.moist_target}, nie über ${profile.moist_max} (von 100)`,
-    `Portion: ${profile.dose_ml} ml, frühestens alle ${profile.min_pause_h} h`,
+    `Portion: ${profile.dose_ml} ml (bis zu 3 pro Gießen), frühestens alle ${profile.min_pause_h} h`,
     "",
     `Wird beim nächsten Kontakt an das Gerät übertragen (bis ~${Math.ceil(POLL_S / 60)} min).`,
   ].join("\n");

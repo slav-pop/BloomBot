@@ -21,7 +21,7 @@
 
 // ============ LED-strip ==============
 #define TOTAL_LEDS     60   // whole 1m of strip
-#define ACTIVE_LEDS    15   // how many diods are realy in use
+#define ACTIVE_LEDS    35   // how many diods are realy in use
 // #define BRIGHTNESS     200  // ATTENTION: on a real use set to ~30
 #define BRIGHTNESS     30   // real use 
 #define MAX_MILLIAMPS  500  // hard power limit
@@ -30,7 +30,7 @@
 // 1.3" IPS 240x240, ST7789 (module GMT130-V1.0)
 #define DISPLAY_ENABLED   1            // 0 = no screen connected
 #define DISPLAY_SPI_HZ    40000000UL   // lower to 20000000 if the picture has glitches
-#define DISPLAY_ROTATION  3            // 0..3: turn the picture in 90° steps (fit to the case).
+#define DISPLAY_ROTATION  1            // 0..3: turn the picture in 90° steps (fit to the case).
                                        // 3: the screen is mounted turned 90° clockwise in the case
 #define DISPLAY_FRAME_MS  100UL        // ~10 frames/s; one frame blocks loop() ~30 ms
 
@@ -38,7 +38,7 @@
 // These two numbers need to be
 // calibrated using an actual tank (measured with a ruler)
 #define TANK_DIST_FULL_CM  3.0f  // full tank distance
-#define TANK_DIST_EMPTY_CM  20.0f // empty tank distance
+#define TANK_DIST_EMPTY_CM  10.2f // empty tank distance
 
 // Hysteresis, so that the "low water" status doesn't keep
 // flickering back and forth at the threshold

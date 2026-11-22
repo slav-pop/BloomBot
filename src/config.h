@@ -157,4 +157,4 @@ static_assert(WATER_DOSE_ML <= DOSE_MAX_ML, "WATER_DOSE_ML is bigger than DOSE_M
 #define NET_CONNECT_TIMEOUT_MS  4000    // give up connecting after 4 s (LED freeze at most this long)
 #define NET_TIMEOUT_MS          4000    // give up waiting for the answer after 4 s
 #define NET_JSON_SIZE           768     // bytes for the status JSON
-#define TANK_CAPACITY_ML        2000    // TBD: real tank volume, sent to the server for the water forecast
+#define TANK_CAPACITY_ML        1700    // TBD: real tank volume, sent to the server for the water forecast

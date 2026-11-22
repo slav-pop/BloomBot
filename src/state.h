@@ -7,7 +7,7 @@
 
 // All LED-status
 enum LedStatus {
-  STATUS_IDLE,            // all is OK / test-mode
+  STATUS_IDLE,            // rainbow: no plant assigned yet (or no soil data right after boot)
   STATUS_NEED_WATER,      // red breathing
   STATUS_WATERING,        // blue comet
   STATUS_LOW_WATER,       // yellow warning

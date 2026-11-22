@@ -133,6 +133,23 @@ static void printState() {
              (unsigned long)(demoUsed ? glassMl() : 0), (unsigned long)glassBudgetMl());
 }
 
+// Demo part of the 'h' help. Keep in sync with simHandleCommand() below.
+void simPrintHelp() {
+  Log.println();
+  Log.println("FAIR DEMO (simulated sensors; pump, LEDs, screen stay real)");
+  Log.println("  D   soil dry (below moist_min) -> watering starts");
+  Log.println("  -   soil -10        +   soil +10");
+  Log.println("  L   tank almost empty");
+  Log.println("  [   tank -10 %      ]   tank +10 %");
+  Log.println("  V   tank full again");
+  Log.println("  H   hose off / on (water does not reach the soil)");
+  Log.println("  G   new empty glass: water budget starts again");
+  Log.println("  o   simulation off: real sensors again");
+  Log.println("  j   one status line for the web page (STATE {...})");
+  Log.print  ("  now: ");
+  Log.println((soil >= 0 || tank >= 0 || hoseOff) ? "simulation ON" : "real sensors");
+}
+
 bool simHandleCommand(char c) {
   if (c != 'j' && strchr("+-D][LVHoG", c)) useDemoPlant();
   switch (c) {

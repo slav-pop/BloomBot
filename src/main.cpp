@@ -14,7 +14,9 @@
 #include "sim.h"
 
 // ============================================================
-//  Commands - in the Serial Monitor (cable) or over Wi-Fi (telnet, see logger.h):
+//  Commands - in the Serial Monitor (cable) or over Wi-Fi (telnet, see logger.h).
+//  'h' prints this list on the device (printHelp, keep both in sync):
+//    h, ?  - help: all commands with a short description
 //    s     - watering status
 //    t     - tank data
 //    m     - measure soil now
@@ -57,7 +59,7 @@ static void printMoisture() {
 }
 
 // ---- Core: choose what is more important to show ----
-// error > watering > low/empty tank > dry soil > connecting > okay > idle
+// error > watering > low/empty tank > dry soil > connecting > no plant (idle) > okay
 static void updateStatus() {
   if (manualMode) return;
 
@@ -71,10 +73,12 @@ static void updateStatus() {
     state.ledStatus = STATUS_NEED_WATER;
   } else if (state.wifiConnecting) {
     state.ledStatus = STATUS_WIFI_CONNECTING;
-  } else if (state.moistureIndex >= 0) {
-    state.ledStatus = STATUS_OKAY;                // sensor data present, all fine
+  } else if (state.profile.plantId < 0 || state.moistureIndex < 0) {
+    // No plant assigned yet (waters with the default profile) or no soil
+    // data yet right after boot: rainbow = "choose a plant in the app"
+    state.ledStatus = STATUS_IDLE;
   } else {
-    state.ledStatus = STATUS_IDLE;                // no data yet
+    state.ledStatus = STATUS_OKAY;                // plant assigned, sensor data present, all fine
   }
 }
 
@@ -85,10 +89,48 @@ static void setManualLed(LedStatus s, const char* name) {
   Log.println(name);
 }
 
+// ---- 'h' / '?': list of all commands, grouped, with a short description ----
+static void printHelp() {
+  Log.println();
+  Log.println("================= BloomBot commands =================");
+  Log.println("Type one character (Serial Monitor or telnet).");
+  Log.println();
+  Log.println("STATUS / INFO");
+  Log.println("  s   watering status: phase, attempts, last watering");
+  Log.println("  t   water tank: distance to water, level %");
+  Log.println("  m   measure soil moisture now (both sensors)");
+  Log.println("  i   Wi-Fi (IP, signal) and server connection");
+  Log.println("  p   show the current plant profile");
+  Log.println("  e   show events waiting to be sent to the server");
+  Log.println("  f   screen: frame time and free memory");
+  Log.println();
+  Log.println("ACTIONS");
+  Log.println("  w   water now (manual test; still checks the tank)");
+  Log.println("  r   reset a watering error (only in phase ERROR)");
+  Log.println("  n   send the status to the server now");
+  Log.println();
+  Log.println("PLANT PROFILE");
+  Log.println("  T   load a test profile (Monstera), saved in flash");
+  Log.println("  F   FACTORY RESET: forget the plant profile");
+  Log.println();
+  Log.println("LED STRIP + SCREEN TEST (force a status)");
+  Log.println("  0 no plant (rainbow)  1 need water  2 watering  3 low water");
+  Log.println("  4 Wi-Fi connecting  5 okay  6 error");
+  Log.println("  a   back to automatic status (normal mode)");
+  simPrintHelp();
+  Log.println();
+  Log.println("  h   show this help again");
+  Log.println("=====================================================");
+}
+
 // ---- Test control: one command character, from the cable or from telnet ----
 static void handleCommand(char ch) {
   if (simHandleCommand(ch)) return;   // fair demo commands, see sim.h
   switch (ch) {
+  case 'h':
+  case '?':
+    printHelp();
+    break;
   case 's':
     Log.print("WATER: phase=");
     Log.print(waterPhaseName(state.waterPhase));
@@ -202,7 +244,7 @@ void setup() {
   displayBegin();       // after profileBegin: the screen shows the plant name
   wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
-  Log.println("The system is running. Commands: s t m w r i n p T e F f a 0-6, demo: - + D [ ] L V H o j");
+  Log.println("The system is running. Type 'h' for the list of commands.");
   eventPush("boot", 0, 0, FW_VERSION);
 #if WATER_TEST_TIMING
   Log.println("!!! WATER_TEST_TIMING = 1 (short test times) !!!");

@@ -29,6 +29,7 @@
 // ============================================================
 
 bool simHandleCommand(char c);   // true = c was a simulation command (handled)
+void simPrintHelp();             // the demo part of the 'h' help (main.cpp printHelp)
 void simUpdate();                // call every loop() after pumpUpdate()
 int  simSoil();                  // simulated soil index 0..100, -1 = real sensors
 int  simTankLimit();             // simulated tank level 0..100, -1 = real sensor only

@@ -24,6 +24,8 @@
 //      no attempts left, < moistMin  -> ERROR (still dry)
 //  TANK_EMPTY --(tank refilled)--> IDLE, immediate soil check
 //  ERROR --(manual reset)--> IDLE, immediate soil check
+//  In TANK_EMPTY and ERROR the soil is still measured every
+//  MOISTURE_CHECK_INTERVAL_MS, only for the screen/server (no watering decision).
 //
 //  The pump never starts automatically at index >= moistMax.
 //  Serial 'w' (manual test) ignores moistMax and the pause, not the tank.
@@ -162,6 +164,15 @@ static void requestSoilCheck(bool afterWatering) {
     moistureRequest();
 }
 
+// ---- TANK_EMPTY / ERROR: keep measuring the soil for the screen and the server ----
+// Same interval as in IDLE (no extra wear on the probes), but the result
+// is NOT evaluated: no watering decision is made in these phases.
+static void displayOnlySoilCheck(unsigned long now) {
+    if (moistureBusy() || now - lastCheckAt < MOISTURE_CHECK_INTERVAL_MS) return;
+    lastCheckAt = now;
+    moistureRequest();
+}
+
 // true once, when the requested measurement has finished
 static bool soilResultReady() {
     if (!soilPending || state.moistureSeq == soilSeq) return false;
@@ -292,6 +303,8 @@ void pumpUpdate() {
             if (state.tankPercent > TANK_LOW_OFF_PERCENT) {   // refilled
                 checkDelay = 0;                    // check the soil right away
                 enterPhase(PHASE_IDLE);
+            } else {
+                displayOnlySoilCheck(now);
             }
             break;
 
@@ -304,6 +317,8 @@ void pumpUpdate() {
                 state.waterAttempts = 0;
                 checkDelay = 0;                    // check the soil right away
                 enterPhase(PHASE_IDLE);
+            } else {
+                displayOnlySoilCheck(now);
             }
             break;
     }

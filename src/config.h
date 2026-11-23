@@ -75,11 +75,15 @@
 // (INTEGRATION): 0 = dry soil, 100 = freshly watered and drained soil.
 // Water is NOT a good reference:
 // in a glass the probe reads ~160-600 and drifts up by itself (electrolysis).
-// TODO: calibrate in the real pot: DRY = dry soil, WET = after watering
-#define DRY_VAL_1 4095  // sensor 1 in air (ESP32 ADC saturates at ~3.1 V)
-#define WET_VAL_1 1500  // sensor 1 in a glass of water
-#define DRY_VAL_2 4095  // sensor 2 in air
-#define WET_VAL_2 1500  // sensor 2 in a glass of water
+// Two-point calibration in real soil (23.11.2026, 5-6 readings each, median):
+//   dry soil -> raw 4095 (the ADC saturates, same as in air) -> index 0
+//   wet soil -> raw ~630 / ~650 (spread 560-840)              -> index MOISTURE_WET_INDEX
+// Wetter than the wet soil gives more than MOISTURE_WET_INDEX, up to 100.
+#define DRY_VAL_1 4095  // sensor 1 in dry soil
+#define WET_VAL_1 630   // sensor 1 in wet soil
+#define DRY_VAL_2 4095  // sensor 2 in dry soil
+#define WET_VAL_2 650   // sensor 2 in wet soil
+#define MOISTURE_WET_INDEX  70  // index of the wet soil above (= DEFAULT_MOIST_MAX: no pumping)
 // The sensors get power only while measuring: less corrosion of the probes
 #define MOISTURE_POWER_ON_MS  300  // settle time after power on (30 ms was too short: dry read ~2700)
 #define MOISTURE_SENSORS      2    // two sensors in one pot

@@ -46,8 +46,9 @@ static int readSensorRaw(uint8_t pin) {
 }
 
 // ---- raw ADC -> index 0..100 (0 = dry soil, 100 = freshly watered), own calibration per sensor ----
+// DRY -> 0, WET (wet soil) -> MOISTURE_WET_INDEX, linear; wetter soil goes above it (max 100)
 static int rawToIndex(int raw, int i) {
-    long p = map(raw, DRY[i], WET[i], 0, 100);
+    long p = map(raw, DRY[i], WET[i], 0, MOISTURE_WET_INDEX);
     return (int)constrain(p, 0L, 100L);
 }
 

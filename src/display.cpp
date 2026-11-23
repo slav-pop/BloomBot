@@ -9,7 +9,7 @@
 // screen scaled x2 (each canvas pixel becomes 2x2 screen pixels).
 // A full size canvas 240x192 would need 92 KB RAM, this one needs 23 KB
 // (the HTTPS keep-alive connection already holds ~40 KB).
-// Sending one frame takes ~20 ms and loop() waits that long,
+// Sending one frame takes ~28 ms at 26.7 MHz and loop() waits that long,
 // so only ~10 frames per second.
 //
 // Scene per mood (state.ledStatus, chosen by main.cpp):
@@ -1169,7 +1169,158 @@ void displayPrintStats() {
              (unsigned)(ESP.getMaxAllocHeap() / 1024));
 }
 
+// ===================== Screen recovery (restart after supply dips) =====================
+//
+// When the pump switches on, its inrush current and the relay coil make the 5 V
+// supply dip. The ST7789 controller resets itself and stays in sleep mode: the
+// backlight (BLK on 3V3) keeps shining, but the picture is black. The ESP32 keeps
+// running and cannot read the screen back (no MISO), so the screen is restarted
+// blindly at the moments when a dip is likely:
+//   - DISPLAY_REINIT_AFTER_PUMP_ON_MS after pumpOn false -> true (inrush is over),
+//   - DISPLAY_REINIT_AFTER_PUMP_OFF_MS after pumpOn true -> false,
+//   - every DISPLAY_REINIT_INTERVAL_MS.
+// Hard restart (pump edges, command 'R'): RES pulse + the init commands of the
+// library. Only RES re-syncs the serial interface (there is no CS pin), but the
+// screen is black for ~140 ms.
+// Soft restart (periodic): the same init commands without RES. SLPOUT / DISPON do
+// nothing to a controller that is awake, so nothing blinks; a controller that fell
+// back into sleep mode wakes up.
+// Both are a non-blocking step machine on millis(): the pauses the controller needs
+// never block loop(), so the pump state machine (and its safety timer) keeps running
+// on time. Only the last step sends a few command bytes (well under 1 ms); the next
+// normal frame then redraws the whole screen (scene + both text lines).
+// tft.init() is NOT used here: it blocks ~600 ms (delay() in the library).
+
+enum ReinitStep { REINIT_IDLE, REINIT_RES_LOW, REINIT_RES_WAIT, REINIT_SLPOUT_WAIT };
+
+static ReinitStep reinitStep = REINIT_IDLE;
+static uint32_t reinitStepAt = 0;       // millis() when the current step began
+static uint32_t reinitStartedAt = 0;    // millis() when the restart began
+static uint32_t lastReinitAt = 0;       // for the periodic restart
+static uint32_t reinitCount = 0;        // restarts since boot (log only)
+static const char* reinitReason = "";
+static bool reinitHard = false;        // current restart uses the RES pulse
+static bool pumpWasOn = false;          // last seen state.pumpOn, for edge detection
+static uint32_t pumpOnAt = 0;           // millis() of the last pumpOn false -> true
+static uint32_t pumpOffAt = 0;          // millis() of the last pumpOn true -> false
+static bool reinitAfterPumpOnDue = false;
+static bool reinitAfterPumpOffDue = false;
+static uint32_t lastFrame = 0;          // frame timer of displayUpdate()
+
+static void drawSafeModeText();
+
+// Starts (or restarts from the beginning) a screen restart.
+// hard = with RES pulse (screen black ~140 ms), else only the init commands.
+static void startReinit(const char* reason, bool hard) {
+  uint32_t now = millis();
+  if (hard) {
+    digitalWrite(DISPLAY_RST_PIN, LOW);   // hardware reset of the controller
+    reinitStep = REINIT_RES_LOW;
+  } else {
+    tft.sendCommand(ST77XX_SLPOUT);       // no-op if the controller is awake
+    reinitStep = REINIT_SLPOUT_WAIT;
+  }
+  reinitStepAt = now;
+  reinitStartedAt = now;
+  lastReinitAt = now;
+  reinitReason = reason;
+  reinitHard = hard;
+}
+
+// Advances the restart; returns true while it is running (no drawing then)
+static bool runReinit(uint32_t now) {
+  switch (reinitStep) {
+    case REINIT_IDLE:
+      return false;
+
+    case REINIT_RES_LOW:
+      if (now - reinitStepAt >= DISPLAY_RESET_LOW_MS) {
+        digitalWrite(DISPLAY_RST_PIN, HIGH);
+        reinitStep = REINIT_RES_WAIT;
+        reinitStepAt = now;
+      }
+      return true;
+
+    case REINIT_RES_WAIT:
+      if (now - reinitStepAt >= DISPLAY_RESET_WAIT_MS) {
+        tft.sendCommand(ST77XX_SLPOUT);  // out of sleep mode
+        reinitStep = REINIT_SLPOUT_WAIT;
+        reinitStepAt = now;
+      }
+      return true;
+
+    case REINIT_SLPOUT_WAIT: {
+      if (now - reinitStepAt < DISPLAY_SLPOUT_WAIT_MS) return true;
+      uint32_t t0 = micros();
+      // same settings as the library's generic_st7789 init list
+      const uint8_t colorMode = 0x55;                 // 16-bit color
+      tft.sendCommand(ST77XX_COLMOD, &colorMode, 1);
+      tft.setRotation(DISPLAY_ROTATION);              // memory access direction (MADCTL)
+      tft.sendCommand(ST77XX_INVON);                  // this panel needs inverted colors
+      tft.sendCommand(ST77XX_NORON);
+      tft.sendCommand(ST77XX_DISPON);
+      uint32_t sendUs = micros() - t0;
+      // after a dip the screen memory may be lost: redraw everything with the next frame
+      shownName[0] = '\0';
+      shownData[0] = '\0';
+      lastFrame = now - DISPLAY_FRAME_MS;
+      if (safeMode && reinitHard) drawSafeModeText();   // RES may have cleared it
+      reinitStep = REINIT_IDLE;
+      reinitCount++;
+      Log.printf("DISPLAY: %s restart (%s), #%lu, took %lu ms, blocking only %lu us\r\n",
+                 reinitHard ? "hard" : "soft", reinitReason, (unsigned long)reinitCount,
+                 (unsigned long)(now - reinitStartedAt), (unsigned long)sendUs);
+      return false;
+    }
+  }
+  return false;
+}
+
+// Watches state.pumpOn and the periodic timer, starts restarts when due
+static void scheduleReinit(uint32_t now) {
+  bool pumpOn = state.pumpOn;
+  if (pumpOn && !pumpWasOn) {           // pump switched on: wait for the inrush to pass
+    pumpOnAt = now;
+    reinitAfterPumpOnDue = true;
+    reinitAfterPumpOffDue = false;
+  } else if (!pumpOn && pumpWasOn) {    // pump switched off: let a held-back server call run first
+    pumpOffAt = now;
+    reinitAfterPumpOnDue = false;
+    reinitAfterPumpOffDue = true;
+  }
+  pumpWasOn = pumpOn;
+
+  if (reinitAfterPumpOnDue && now - pumpOnAt >= DISPLAY_REINIT_AFTER_PUMP_ON_MS) {
+    reinitAfterPumpOnDue = false;
+    startReinit("pump on", true);
+  }
+  if (reinitAfterPumpOffDue && now - pumpOffAt >= DISPLAY_REINIT_AFTER_PUMP_OFF_MS) {
+    reinitAfterPumpOffDue = false;
+    startReinit("pump off", true);
+  }
+  // periodic: never during the inrush window or while a pump restart is pending
+  if (reinitStep == REINIT_IDLE && !reinitAfterPumpOnDue && !reinitAfterPumpOffDue &&
+      !state.pumpOn && now - lastReinitAt >= DISPLAY_REINIT_INTERVAL_MS) {
+    startReinit("periodic", false);
+  }
+}
+
+// No drawing right after the pump switched on: a dip during an SPI transfer is
+// the most likely moment to upset the controller, and it is restarted anyway
+static bool pumpInrushWindow(uint32_t now) {
+  return state.pumpOn && now - pumpOnAt < DISPLAY_REINIT_AFTER_PUMP_ON_MS;
+}
+
 // ===================== Public =====================
+
+void displayReinitNow() {
+  if (!displayOk && !safeMode) {
+    Log.println("DISPLAY: off, nothing to restart");
+    return;
+  }
+  Log.println("DISPLAY: restart requested");
+  startReinit("manual", true);   // a pending pump-on restart still follows
+}
 
 void displayBegin() {
   if (!DISPLAY_ENABLED) return;
@@ -1184,10 +1335,13 @@ void displayBegin() {
   tft.cp437(true);   // correct code page 437 table for ä, ö, ü (see utf8ToScreen)
   tft.fillScreen(ST77XX_BLACK);
 
+  lastReinitAt = millis();   // tft.init() just did a full reset
+  pumpWasOn = state.pumpOn;
+
   if (crashedHere) {
     safeMode = true;
     Log.println("DISPLAY: the last crash happened in the display code -> safe mode, animation off");
-    drawTextLine(FLOWER_Y + 84, "Display safe mode", rgb(255, 150, 0));
+    drawSafeModeText();
     inDisplayCode = 0;
     return;
   }
@@ -1201,11 +1355,20 @@ void displayBegin() {
   inDisplayCode = 0;
 }
 
-void displayUpdate() {
-  if (!displayOk) return;
+// Safe mode: no animation, only this text (also redrawn after a restart)
+static void drawSafeModeText() {
+  tft.fillScreen(ST77XX_BLACK);
+  drawTextLine(FLOWER_Y + 84, "Display safe mode", rgb(255, 150, 0));
+}
 
-  static uint32_t lastFrame = 0;
+void displayUpdate() {
+  if (!displayOk && !safeMode) return;
+
   uint32_t now = millis();
+  scheduleReinit(now);
+  if (runReinit(now)) return;                       // restart running: no drawing
+  if (!displayOk) return;                           // safe mode: no animation
+  if (pumpInrushWindow(now)) return;                // pump just switched on: no drawing
   if (now - lastFrame < DISPLAY_FRAME_MS) return;   // non-blocking frame timer
   lastFrame = now;
 

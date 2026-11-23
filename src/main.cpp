@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <esp_system.h>
 #include "config.h"
 #include "state.h"
 #include "logger.h"
@@ -22,13 +23,14 @@
 //    m     - measure soil now
 //    w     - water now (manual test: checks the tank, ignores moist_max and the pause)
 //    r     - reset watering error
-//    i     - Wi-Fi: IP address and signal, server connection
+//    i     - Wi-Fi: IP address and signal, server connection, reason of the last reboot
 //    n     - send the status to the server now
 //    p     - show the plant profile
 //    e     - show the events waiting for the server
 //    F     - forget the plant profile (factory reset), back to defaults
 //    T     - apply a test profile (Monstera) and save it in flash
 //    f     - screen: frame time (last / max) and free memory
+//    R     - screen: restart the controller now (black screen after a supply dip)
 //    Fair demo (sim.h): - + D soil, [ ] L V tank, H hose, o real sensors, j status line
 //    a     - LED: automatic status (normal mode)
 //    0..6  - LED + screen: force a status (test):
@@ -37,6 +39,29 @@
 // ============================================================
 
 static bool manualMode = false;  // true = manual LED choice from keyboard
+
+// Why the ESP32 started the last time. Brownout = the supply dipped so low that
+// the ESP32 itself reset (e.g. pump inrush current), not only the screen.
+static const char* resetReasonText() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON:   return "power on";
+    case ESP_RST_EXT:       return "external reset pin (EN button)";
+    case ESP_RST_SW:        return "software restart (e.g. after an OTA update)";
+    case ESP_RST_PANIC:     return "crash (exception / panic)";
+    case ESP_RST_INT_WDT:   return "crash (interrupt watchdog)";
+    case ESP_RST_TASK_WDT:  return "crash (task watchdog)";
+    case ESP_RST_WDT:       return "crash (other watchdog)";
+    case ESP_RST_DEEPSLEEP: return "wake up from deep sleep";
+    case ESP_RST_BROWNOUT:  return "BROWNOUT - the supply voltage dipped too low";
+    case ESP_RST_SDIO:      return "SDIO reset";
+    default:                return "unknown";
+  }
+}
+
+static void printResetReason() {
+  Log.print("BOOT: last reset reason: ");
+  Log.println(resetReasonText());
+}
 
 // serial 'm': the measurement is non-blocking, print when the result is there
 static bool printMoistureWhenReady = false;
@@ -99,10 +124,11 @@ static void printHelp() {
   Log.println("  s   watering status: phase, attempts, last watering");
   Log.println("  t   water tank: distance to water, level %");
   Log.println("  m   measure soil moisture now (both sensors)");
-  Log.println("  i   Wi-Fi (IP, signal) and server connection");
+  Log.println("  i   Wi-Fi (IP, signal), server connection, last reboot reason");
   Log.println("  p   show the current plant profile");
   Log.println("  e   show events waiting to be sent to the server");
   Log.println("  f   screen: frame time and free memory");
+  Log.println("  R   screen: restart it now (if it stays black)");
   Log.println();
   Log.println("ACTIONS");
   Log.println("  w   water now (manual test; still checks the tank)");
@@ -181,6 +207,7 @@ static void handleCommand(char ch) {
     Log.println("-> reset error (only in ERROR)");
     break;
   case 'i':
+    printResetReason();   // also here: telnet is not connected yet at boot
     wifiOtaPrintInfo();
     netPrintInfo();
     break;
@@ -217,6 +244,9 @@ static void handleCommand(char ch) {
   case 'f':
     displayPrintStats();
     break;
+  case 'R':
+    displayReinitNow();   // prints whether the restart was started
+    break;
   case 'a':
     manualMode = false;
     Log.println("-> LED auto mode");
@@ -244,6 +274,7 @@ void setup() {
   displayBegin();       // after profileBegin: the screen shows the plant name
   wifiOtaBegin();        // IP address is printed as soon as Wi-Fi is connected
 
+  printResetReason();
   Log.println("The system is running. Type 'h' for the list of commands.");
   eventPush("boot", 0, 0, FW_VERSION);
 #if WATER_TEST_TIMING

@@ -29,10 +29,24 @@
 // ============ Display ================
 // 1.3" IPS 240x240, ST7789 (module GMT130-V1.0)
 #define DISPLAY_ENABLED   1            // 0 = no screen connected
-#define DISPLAY_SPI_HZ    40000000UL   // lower to 20000000 if the picture has glitches
+#define DISPLAY_SPI_HZ    27000000UL   // the ESP32 takes the next lower step: 80/3 = 26.7 MHz.
+                                       // Was 40 MHz; slower is more robust against supply dips
 #define DISPLAY_ROTATION  1            // 0..3: turn the picture in 90° steps (fit to the case).
                                        // 3: the screen is mounted turned 90° clockwise in the case
-#define DISPLAY_FRAME_MS  100UL        // ~10 frames/s; one frame blocks loop() ~30 ms
+#define DISPLAY_FRAME_MS  100UL        // ~10 frames/s; one frame blocks loop() ~40 ms at 26.7 MHz
+
+// Screen recovery: the pump inrush current (and the relay coil) can make the
+// supply dip, the ST7789 controller resets and stays black (backlight still on).
+// The screen is then restarted in software: RES pulse + init commands, non-blocking.
+#define DISPLAY_REINIT_AFTER_PUMP_ON_MS  500UL     // restart this long after the pump switched on;
+                                                   // no drawing at all before (inrush current)
+#define DISPLAY_REINIT_AFTER_PUMP_OFF_MS 300UL     // restart this long after the pump switched off: a server
+                                                   // call held back while pumping runs first (blocks up to 8 s)
+#define DISPLAY_REINIT_INTERVAL_MS       180000UL  // and every 3 min a soft restart (no RES pulse, no blinking),
+                                                   // in case a dip came from elsewhere
+#define DISPLAY_RESET_LOW_MS             10UL      // RES held LOW
+#define DISPLAY_RESET_WAIT_MS            120UL     // ST7789: after RES wait up to 120 ms before SLPOUT
+#define DISPLAY_SLPOUT_WAIT_MS           10UL      // ST7789: wait >= 5 ms after SLPOUT before next commands
 
 // ============ Water tank ==============
 // These two numbers need to be

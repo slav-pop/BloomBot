@@ -768,6 +768,30 @@
     }
   },
   {
+    "id": 9016,
+    "name_de": "Orchidee",
+    "common_name": "Moth orchid",
+    "scientific_name": "Phalaenopsis spp.",
+    "sunlight": "part shade, filtered shade",
+    "irrigation_profile": {
+      "water_need_category": "low",
+      "soil_moisture": {
+        "minimum_before_watering_percent": 15,
+        "recommended_target_percent": 35,
+        "maximum_safe_percent": 55
+      },
+      "watering_cycle": {
+        "minimum_days": 7,
+        "maximum_days": 10
+      },
+      "pump_calculation": {
+        "base_ml_per_liter_of_soil": 80,
+        "minimum_water_ml": 50,
+        "maximum_water_ml": 400
+      }
+    }
+  },
+  {
     "id": 710,
     "name_de": "Pfeilblatt",
     "common_name": "elephant's ear",

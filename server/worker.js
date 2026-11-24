@@ -66,6 +66,7 @@ const PLANTS = [
   {"id": 9014, "de": "Marante", "en": "Prayer plant", "sci": "Maranta leuconeura", "min": 30, "target": 50, "max": 70, "days_min": 5, "days_max": 7, "ml_per_l": 120, "ml_min": 80, "ml_max": 600},
   {"id": 2976, "de": "Mosaikpflanze", "en": "Nerve Plant", "sci": "Fittonia albivenis (Argyroneura Group)", "min": 30, "target": 50, "max": 70, "days_min": 1, "days_max": 2, "ml_per_l": 120, "ml_min": 80, "ml_max": 600},
   {"id": 1038, "de": "Nestfarn", "en": "bird's nest fern", "sci": "Asplenium nidus 'Antiquum'", "min": 30, "target": 50, "max": 70, "days_min": 2, "days_max": 3, "ml_per_l": 120, "ml_min": 80, "ml_max": 600},
+  {"id": 9016, "de": "Orchidee", "en": "Moth orchid", "sci": "Phalaenopsis spp.", "min": 15, "target": 35, "max": 55, "days_min": 7, "days_max": 10, "ml_per_l": 80, "ml_min": 50, "ml_max": 400},
   {"id": 710, "de": "Pfeilblatt", "en": "elephant's ear", "sci": "Alocasia amazonica", "min": 30, "target": 50, "max": 70, "days_min": 6, "days_max": 9, "ml_per_l": 120, "ml_min": 80, "ml_max": 600},
   {"id": 1036, "de": "Schusterpalme", "en": "cast-iron plant", "sci": "Aspidistra elatior", "min": 30, "target": 50, "max": 70, "days_min": 6, "days_max": 9, "ml_per_l": 120, "ml_min": 80, "ml_max": 600},
   {"id": 9011, "de": "Strahlenaralie", "en": "Dwarf umbrella tree", "sci": "Schefflera arboricola", "min": 30, "target": 50, "max": 70, "days_min": 7, "days_max": 10, "ml_per_l": 120, "ml_min": 80, "ml_max": 600},
